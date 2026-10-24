@@ -95,7 +95,7 @@
       <div style="display: flex; flex-direction: column; gap: 16px;">
         
         <!-- Primary Orbital Visualization Panel -->
-        <div class="orbital-viz-panel">
+        <div class="orbital-viz-panel" style="height: 440px;">
           <div class="orbital-viz-header">
             <div class="orbital-legend">
               <span class="legend-item">
@@ -107,20 +107,35 @@
               <span class="legend-item">
                 <span class="legend-marker orbit"></span> CONJUNCTION NODE
               </span>
+              <span class="legend-item" id="legend-post-burn" style="display: none;">
+                <span class="legend-marker" style="border: 1px dashed var(--color-nominal);"></span> POST-BURN PREVIEW
+              </span>
             </div>
 
             <div class="orbital-controls">
-              <button class="btn btn-secondary btn-sm active" id="btn-viz-plane">ORBITAL PLANE</button>
-              <button class="btn btn-secondary btn-sm" id="btn-viz-encounter">HILL ENCOUNTER (CW)</button>
-              <button class="btn btn-secondary btn-sm" id="btn-viz-fallback">SIMULATE FALLBACK</button>
+              <button class="btn btn-secondary btn-sm active" id="btn-viz-3d">3D ORBIT VIEW</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-plane">2D PLANE</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-encounter">HILL CW</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-toggle-maneuver">POST-BURN PREVIEW</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-focus">FOCUS ASSET</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-reset-cam">RESET CAM</button>
             </div>
           </div>
 
-          <!-- Canvas Rendering Surface -->
-          <canvas id="orbit-canvas" class="viz-canvas"></canvas>
+          <!-- 3D WebGL Rendering Surface -->
+          <div id="orbital-3d-container" style="width: 100%; height: 100%; position: absolute; inset: 0;"></div>
+
+          <!-- 2D Canvas Surface (Fallback and Plane/Encounter mode) -->
+          <canvas id="orbit-canvas" class="viz-canvas" style="display: none; position: absolute; inset: 0;"></canvas>
 
           <!-- Fallback Container (for loading / errors / manual toggle) -->
           <div id="orbit-canvas-fallback" class="viz-fallback" style="display: none;"></div>
+
+          <!-- Reference Frame & Scale Disclosure Strip -->
+          <div style="position: absolute; bottom: 8px; left: 14px; right: 14px; display: flex; justify-content: space-between; font-size: 0.66rem; font-family: var(--font-mono); color: var(--text-muted); pointer-events: none;">
+            <span>FRAME: ECI J2000 | SCALE: 1 UNIT = 1,000 KM | EARTH R = 6,378 KM</span>
+            <span>MARKERS EXAGGERATED FOR OPERATIONAL VISIBILITY</span>
+          </div>
         </div>
 
         <!-- Active Conjunction Alerts Table Panel -->

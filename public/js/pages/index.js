@@ -5,63 +5,106 @@
 import { ApiClient, formatMissDistance, formatRelativeVelocity, formatProbability, formatCountdown, formatUtcTimestamp } from '../api.js';
 import { store } from '../state.js';
 import { OrbitCanvasVisualizer } from '../components/orbit-canvas.js';
+import { OrbitalSceneVisualizer } from '../scene/orbital-scene.js';
 
 class MissionControlController {
   constructor() {
     this.canvasVisualizer = null;
+    this.orbital3d = null;
     this.tcaInterval = null;
     this.conjunctions = [];
     this.satellites = [];
     this.events = [];
+    this.scenario = null;
     this.selectedSatellite = null;
   }
 
   async init() {
-    this.initCanvas();
+    this.initVisualizers();
     this.initEventListeners();
     await this.loadAllData();
     this.startTcaTicker();
   }
 
-  initCanvas() {
-    const canvasEl = document.getElementById('orbit-canvas');
+  initVisualizers() {
+    // 1. Initialize 3D Orbital Scene
+    const container3d = document.getElementById('orbital-3d-container');
     const fallbackEl = document.getElementById('orbit-canvas-fallback');
+    if (container3d) {
+      this.orbital3d = new OrbitalSceneVisualizer(container3d, fallbackEl);
+    }
+
+    // 2. Initialize 2D Canvas Visualizer (for 2D Plane and Encounter Zoom modes)
+    const canvasEl = document.getElementById('orbit-canvas');
     if (canvasEl) {
       this.canvasVisualizer = new OrbitCanvasVisualizer(canvasEl, fallbackEl);
     }
   }
 
   initEventListeners() {
-    // Mode switcher buttons for canvas
+    const container3d = document.getElementById('orbital-3d-container');
+    const canvas2d = document.getElementById('orbit-canvas');
+
+    const btn3d = document.getElementById('btn-viz-3d');
     const btnPlane = document.getElementById('btn-viz-plane');
     const btnEncounter = document.getElementById('btn-viz-encounter');
-    const btnFallback = document.getElementById('btn-viz-fallback');
+    const btnToggleManeuver = document.getElementById('btn-viz-toggle-maneuver');
+    const btnFocus = document.getElementById('btn-viz-focus');
+    const btnResetCam = document.getElementById('btn-viz-reset-cam');
+    const legendPostBurn = document.getElementById('legend-post-burn');
 
-    if (btnPlane && btnEncounter) {
+    if (btn3d && container3d && canvas2d) {
+      btn3d.addEventListener('click', () => {
+        btn3d.classList.add('active');
+        btnPlane?.classList.remove('active');
+        btnEncounter?.classList.remove('active');
+        container3d.style.display = 'block';
+        canvas2d.style.display = 'none';
+      });
+    }
+
+    if (btnPlane && container3d && canvas2d) {
       btnPlane.addEventListener('click', () => {
         btnPlane.classList.add('active');
-        btnEncounter.classList.remove('active');
+        btn3d?.classList.remove('active');
+        btnEncounter?.classList.remove('active');
+        container3d.style.display = 'none';
+        canvas2d.style.display = 'block';
         this.canvasVisualizer?.setMode('ORBITAL_PLANE');
       });
+    }
 
+    if (btnEncounter && container3d && canvas2d) {
       btnEncounter.addEventListener('click', () => {
         btnEncounter.classList.add('active');
-        btnPlane.classList.remove('active');
+        btn3d?.classList.remove('active');
+        btnPlane?.classList.remove('active');
+        container3d.style.display = 'none';
+        canvas2d.style.display = 'block';
         this.canvasVisualizer?.setMode('ENCOUNTER_ZOOM');
       });
     }
 
-    if (btnFallback) {
-      btnFallback.addEventListener('click', () => {
-        if (this.canvasVisualizer?.hasError) {
-          this.canvasVisualizer.hasError = false;
-          document.getElementById('orbit-canvas-fallback').style.display = 'none';
-          this.canvasVisualizer.startAnimation();
-          btnFallback.textContent = 'SIMULATE FALLBACK';
-        } else {
-          this.canvasVisualizer?.showFallback('Operator requested manual simulation of hardware acceleration fallback.');
-          btnFallback.textContent = 'RESTORE VIZ';
+    if (btnToggleManeuver) {
+      btnToggleManeuver.addEventListener('click', () => {
+        const isShowing = this.orbital3d?.toggleManeuverPreview();
+        btnToggleManeuver.classList.toggle('active', isShowing);
+        if (legendPostBurn) {
+          legendPostBurn.style.display = isShowing ? 'flex' : 'none';
         }
+      });
+    }
+
+    if (btnFocus) {
+      btnFocus.addEventListener('click', () => {
+        const targetId = store.getState().selectedSatelliteId || 'SAT-LEO-02';
+        this.orbital3d?.focusSatellite(targetId);
+      });
+    }
+
+    if (btnResetCam) {
+      btnResetCam.addEventListener('click', () => {
+        this.orbital3d?.resetCamera();
       });
     }
 
@@ -110,11 +153,12 @@ class MissionControlController {
     try {
       this.canvasVisualizer?.showLoading(true);
 
-      const [summaryRes, conjRes, satsRes, eventsRes] = await Promise.all([
+      const [summaryRes, conjRes, satsRes, eventsRes, scenarioRes] = await Promise.all([
         ApiClient.getFleetSummary().catch(() => null),
         ApiClient.getConjunctions().catch(() => ({ data: [] })),
         ApiClient.getSatellites().catch(() => ({ data: [] })),
-        ApiClient.getEvents({ limit: 6 }).catch(() => ({ data: [] }))
+        ApiClient.getEvents({ limit: 6 }).catch(() => ({ data: [] })),
+        ApiClient.getFeaturedScenario().catch(() => null)
       ]);
 
       if (summaryRes?.data) {
@@ -124,6 +168,12 @@ class MissionControlController {
       this.conjunctions = conjRes?.data || [];
       this.satellites = satsRes?.data || [];
       this.events = eventsRes?.data || [];
+      this.scenario = scenarioRes?.data;
+
+      // Feed full scenario into 3D Orbital Scene
+      if (this.scenario && this.orbital3d) {
+        this.orbital3d.loadScenarioData(this.scenario);
+      }
 
       this.renderFeaturedBanner();
       this.renderConjunctionAlerts();
