@@ -185,53 +185,69 @@
       </div>
     </section>
 
-    <!-- Visual 6-Stage Operational Workflow Strip -->
+    <!-- Visual 8-Stage Operational Workflow Strip -->
     <section class="workflow-strip" aria-label="Operational Workflow Stages">
       <div class="workflow-step completed" id="step-track">
         <span class="step-number">✓</span>
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase;">1. TRACK</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">Fleet Surveillance</div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">1. TRACK</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">Surveillance</div>
         </div>
       </div>
 
       <div class="workflow-step completed" id="step-detect">
         <span class="step-number">✓</span>
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase;">2. DETECT</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">Encounter Flagged</div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">2. DETECT</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">Encounter</div>
         </div>
       </div>
 
       <div class="workflow-step completed" id="step-assess">
         <span class="step-number">✓</span>
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase;">3. ASSESS</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">Risk Evaluated</div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">3. ASSESS</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">AI Evaluation</div>
         </div>
       </div>
 
       <div class="workflow-step completed" id="step-plan">
         <span class="step-number">✓</span>
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase;">4. PLAN</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">CAM Staged</div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">4. PLAN</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">CAM Staged</div>
         </div>
       </div>
 
-      <div class="workflow-step active" id="step-burn">
+      <div class="workflow-step active" id="step-approve">
         <span class="step-number">5</span>
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase;">5. BURN GATE</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">Operator Sign-Off</div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">5. APPROVE</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">Sign-Off Gate</div>
         </div>
       </div>
 
-      <div class="workflow-step" id="step-clear">
+      <div class="workflow-step" id="step-burn">
         <span class="step-number">6</span>
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase;">6. CLEAR</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">Encounter Cleared</div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">6. BURN</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">Sim Execution</div>
+        </div>
+      </div>
+
+      <div class="workflow-step" id="step-verify">
+        <span class="step-number">7</span>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">7. VERIFY</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">Post-Burn Check</div>
+        </div>
+      </div>
+
+      <div class="workflow-step" id="step-close">
+        <span class="step-number">8</span>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase;">8. CLOSE</div>
+          <div style="font-size: 0.65rem; color: var(--text-secondary);">Archived</div>
         </div>
       </div>
     </section>
@@ -317,13 +333,13 @@
             <div id="operator-approval-card" style="background: rgba(255, 51, 75, 0.08); border: 1px solid var(--color-critical); border-radius: var(--border-radius-sm); padding: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <strong style="color: #fff; font-size: 0.95rem;">MANDATORY OPERATOR SIGN-OFF GATE</strong>
-                <span class="badge badge-critical">GATE 5 ACTIVE</span>
+                <span class="badge badge-critical" id="gate-approval-badge">APPROVAL REQUIRED</span>
               </div>
               <p style="font-size: 0.75rem; color: #cbd5e1; margin-bottom: 12px;">
                 <strong>SAFETY BOUNDARY:</strong> The Flight Director provides advisory evaluation. In strict accordance with spaceflight safety doctrine, burn commands cannot execute autonomously without explicit operator sign-off.
               </p>
               
-              <div style="display: flex; gap: 12px; align-items: center;">
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <button class="btn btn-critical" id="btn-approve-burn">
                   OPERATOR AUTHORIZATION: EXECUTE SIMULATED BURN →
                 </button>
@@ -331,20 +347,47 @@
               </div>
             </div>
 
-            <!-- Post-Burn Clearance Banner (Hidden initially) -->
+            <!-- Post-Burn Verification and Clearance Card (Gate 7) -->
             <div id="post-burn-clearance-card" style="display: none; background: rgba(0, 230, 118, 0.1); border: 1px solid var(--color-nominal); border-radius: var(--border-radius-sm); padding: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <strong style="color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
                   <span class="status-dot nominal"></span>
-                  ENCOUNTER OFFICIALLY CLEARED (STAGE 6 COMPLETE)
+                  POST-MANEUVER VERIFICATION COMPLETE
                 </strong>
-                <span class="badge badge-nominal">SAFE CLEARANCE</span>
+                <span class="badge badge-nominal" id="clearance-badge">SAFE CLEARANCE</span>
               </div>
-              <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 12px;" id="clearance-summary-text">
-                Simulated RCS pulse confirmed. New trajectory telemetry verified: Miss distance = 23,115 meters. Collision probability reduced to &lt; 1.0e-09. Event promoted to CLEARED status.
+              <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 10px;" id="clearance-summary-text">
+                Simulated RCS pulse confirmed. New trajectory telemetry verified: Miss distance = 23,115 meters. Collision probability reduced to &lt; 1.0e-09. Target safety criteria satisfied.
               </p>
-              <div style="font-size: 0.7rem; color: #94a3b8; border-top: 1px solid rgba(0, 230, 118, 0.2); padding-top: 8px;">
-                SIMULATION NOTICE: This is a verified simulated operational workflow for test and validation.
+              <div style="background: rgba(0, 229, 255, 0.08); border-left: 3px solid var(--color-cyan); padding: 8px 12px; margin-bottom: 12px; font-size: 0.72rem; color: #94a3b8;">
+                <strong style="color: var(--color-cyan);">VERIFICATION NOTICE:</strong>
+                <span id="verification-notice-text">Illustrative verification (linearized relative encounter model). Baseline scenario preserved. Simulated execution strictly isolated from live flight systems.</span>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-primary btn-sm" id="btn-close-workflow">
+                  ARCHIVE &amp; CLOSE WORKFLOW ✓
+                </button>
+                <a href="history.html" class="btn btn-secondary btn-sm">VIEW AUDIT LEDGER →</a>
+              </div>
+            </div>
+
+            <!-- Closed Workflow Card (State 8) -->
+            <div id="closed-workflow-card" style="display: none; background: var(--bg-surface-raised); border: 1px solid var(--border-medium); border-radius: var(--border-radius-sm); padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                  <span class="status-dot nominal"></span>
+                  MISSION CONJUNCTION WORKFLOW CLOSED
+                </strong>
+                <span class="badge badge-neutral">WORKFLOW CLOSED</span>
+              </div>
+              <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 12px;">
+                All operational phases complete. Candidate avoidance maneuver simulated, verified, and recorded into the mission operations audit ledger. Baseline spacecraft state is preserved.
+              </p>
+              <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" id="btn-reopen-workflow">
+                  ↺ RESET WORKFLOW TO MONITORING
+                </button>
+                <a href="history.html" class="btn btn-primary btn-sm">INSPECT EVENT HISTORY →</a>
               </div>
             </div>
 

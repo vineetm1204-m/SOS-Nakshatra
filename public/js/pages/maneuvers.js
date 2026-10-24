@@ -620,17 +620,28 @@ class ManeuverPlannerController {
       notes: `Planned via Tsiolkovsky solver at lead time ${this.leadHours}h with delta-v ${this.deltaVMps.toFixed(2)} m/s.`
     };
 
-    // Store in sessionStorage for fast client navigation
+    // Store in sessionStorage and StateStore for unified application state
     sessionStorage.setItem('sos_candidate_maneuver', JSON.stringify(candidatePayload));
     sessionStorage.setItem('sos_post_projection', JSON.stringify(projectionPayload));
     sessionStorage.setItem('sos_planned_deltav', this.deltaVMps.toString());
     sessionStorage.setItem('sos_planned_direction', this.burnDirection);
+    store.setCandidateManeuver(candidatePayload);
 
-    // Persist via REST API if server is reachable
+    // Persist candidate and transition workflow via REST API
     try {
       await ApiClient.saveCandidateManeuver(candidatePayload, projectionPayload);
+      const wfRes = await ApiClient.transitionWorkflow({
+        toState: 'MANEUVER_CANDIDATE_CREATED',
+        conjunctionId: this.selectedConjunction.id,
+        satelliteId: this.selectedSatellite.id,
+        candidateManeuver: candidatePayload,
+        notes: `Candidate maneuver ${candidatePayload.id} saved (Δv=${this.deltaVMps.toFixed(2)} m/s, ${this.burnDirection})`
+      });
+      if (wfRes?.data?.currentState) {
+        store.setWorkflowState(wfRes.data.currentState);
+      }
     } catch (e) {
-      console.warn('[SOS Maneuver Planner] Server candidate save warning:', e.message);
+      console.warn('[SOS Maneuver Planner] Server candidate save/workflow warning:', e.message);
     }
 
     const statusBadge = document.getElementById('plan-status-badge');

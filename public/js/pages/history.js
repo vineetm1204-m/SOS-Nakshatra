@@ -88,7 +88,7 @@ class EventHistoryController {
     }
 
     if (this.selectedCategory !== 'ALL') {
-      filtered = filtered.filter(e => e.category === this.selectedCategory);
+      filtered = filtered.filter(e => (e.category || '').toUpperCase() === this.selectedCategory);
     }
 
     if (this.searchQuery) {
@@ -112,7 +112,8 @@ class EventHistoryController {
     }
 
     tbody.innerHTML = filtered.map(e => {
-      const sevClass = e.severity === 'CRITICAL' ? 'badge-critical' : (e.severity === 'WARNING' ? 'badge-warning' : (e.severity === 'SUCCESS' ? 'badge-nominal' : 'badge-cyan'));
+      const sev = (e.severity || '').toUpperCase();
+      const sevClass = sev === 'CRITICAL' ? 'badge-critical' : (sev === 'WARNING' ? 'badge-warning' : (sev === 'SUCCESS' || sev === 'NOMINAL' ? 'badge-nominal' : 'badge-cyan'));
       const obj = e.associatedConjunctionId || e.associatedSatelliteId || 'FLEET';
 
       return `

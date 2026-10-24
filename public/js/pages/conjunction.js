@@ -117,6 +117,21 @@ class ConjunctionPageController {
     store.setSelectedConjunction(conj.id);
     store.setSelectedSatellite(conj.primarySatelliteId);
 
+    // Transition workflow to CONJUNCTION_DETECTED if currently in MONITORING
+    const currentWf = store.getState().workflowState;
+    if (currentWf === 'MONITORING') {
+      ApiClient.transitionWorkflow({
+        toState: 'CONJUNCTION_DETECTED',
+        conjunctionId: conj.id,
+        satelliteId: conj.primarySatelliteId,
+        notes: `Conjunction ${conj.id} inspected in analysis console`
+      }).then(res => {
+        if (res?.data?.currentState) {
+          store.setWorkflowState(res.data.currentState);
+        }
+      }).catch(() => {});
+    }
+
     // Update active button state
     document.querySelectorAll('#conj-event-buttons button').forEach(b => {
       b.classList.toggle('active', b.dataset.conjId === conj.id);

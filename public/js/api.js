@@ -112,6 +112,23 @@ export class ApiClient {
     return this.post('/flight-director/approve', payload);
   }
 
+  // Workflow Endpoints (Phase 7)
+  static async getWorkflowStatus() {
+    return this.get('/workflow/status');
+  }
+
+  static async transitionWorkflow(payload) {
+    return this.post('/workflow/transition', payload);
+  }
+
+  static async executeWorkflowBurn(payload) {
+    return this.post('/workflow/execute-burn', payload);
+  }
+
+  static async resetWorkflow() {
+    return this.post('/workflow/reset', {});
+  }
+
   static async getEvents(filters = {}) {
     return this.get('/events', filters);
   }

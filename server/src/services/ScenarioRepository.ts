@@ -38,6 +38,7 @@ export interface IScenarioDataProvider {
   resetCandidateManeuver(): Promise<ManeuverCandidate>;
   getFlightDirectorAssessment(conjunctionId: string): Promise<FlightDirectorAssessment | undefined>;
   getEvents(filters?: { category?: string; severity?: string; limit?: number }): Promise<OperationalEvent[]>;
+  addOperationalEvent(event: OperationalEvent): Promise<OperationalEvent>;
   getDeterministicScenario(): Promise<DeterministicScenario>;
   validateIntegrity(): { isValid: boolean; errors: string[] };
 }
@@ -146,6 +147,11 @@ export class DemoScenarioProvider implements IScenarioDataProvider {
       result = result.slice(0, filters.limit);
     }
     return result;
+  }
+
+  async addOperationalEvent(event: OperationalEvent): Promise<OperationalEvent> {
+    this.events.unshift(event);
+    return event;
   }
 
   async getDeterministicScenario(): Promise<DeterministicScenario> {
@@ -267,6 +273,9 @@ export class LiveScenarioProvider implements IScenarioDataProvider {
   }
   async getEvents(): Promise<OperationalEvent[]> {
     throw new Error('Live telemetry provider requires configured uplink credentials.');
+  }
+  async addOperationalEvent(event: OperationalEvent): Promise<OperationalEvent> {
+    return event;
   }
   async getDeterministicScenario(): Promise<DeterministicScenario> {
     throw new Error('Live telemetry provider requires configured uplink credentials.');

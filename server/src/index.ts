@@ -5,6 +5,7 @@ import path from 'path';
 import { scenarioRepository } from './services/ScenarioRepository.js';
 import { ManeuverService } from './services/ManeuverService.js';
 import { FlightDirectorService } from './services/FlightDirectorService.js';
+import { workflowService } from './services/WorkflowService.js';
 import { DEFAULT_SETTINGS } from './data/seedData.js';
 import { FleetSummary, SystemSettings } from './types.js';
 
@@ -292,6 +293,38 @@ app.post('/api/v1/flight-director/approve', async (req: Request, res: Response) 
     });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Failed to authorize burn.' });
+  }
+});
+
+// 8. Workflow State Management (Phase 7)
+app.get('/api/v1/workflow/status', (_req: Request, res: Response) => {
+  res.json({ data: workflowService.getStatus() });
+});
+
+app.post('/api/v1/workflow/transition', async (req: Request, res: Response) => {
+  try {
+    const status = await workflowService.transition(req.body);
+    res.json({ data: status });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Workflow transition failed.' });
+  }
+});
+
+app.post('/api/v1/workflow/execute-burn', async (req: Request, res: Response) => {
+  try {
+    const result = await workflowService.executeSimulatedBurn(req.body);
+    res.json({ data: result });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Simulated burn execution failed.' });
+  }
+});
+
+app.post('/api/v1/workflow/reset', async (_req: Request, res: Response) => {
+  try {
+    const status = await workflowService.resetWorkflow();
+    res.json({ data: status, message: 'Workflow successfully reset to initial state.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Workflow reset failed.' });
   }
 });
 

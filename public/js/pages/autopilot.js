@@ -1,35 +1,59 @@
 /**
  * SOS Flight Director Controller (autopilot.js)
- * Manages the 6-stage operational execution workflow, evidence audit, and mandatory operator approval gate.
+ * Manages the 8-stage operational execution workflow, evidence audit,
+ * mandatory operator approval gate, simulated burn execution, and post-maneuver verification.
  */
 import { ApiClient } from '../api.js';
 import { store } from '../state.js';
 
 class FlightDirectorController {
   constructor() {
-    this.workflowStage = 'BURN'; // 'TRACK' | 'DETECT' | 'ASSESS' | 'PLAN' | 'BURN' | 'CLEAR'
     this.forceFallback = false;
     this.conjunctionId = 'CONJ-2026-084';
     this.satelliteId = 'SAT-LEO-02';
     this.candidateManeuver = null;
     this.currentAssessment = null;
+    this.isExecuting = false;
   }
 
   async init() {
     this.initEventListeners();
     this.loadSessionCandidate();
+    await this.syncWorkflowStatus();
     await this.loadAssessment();
   }
 
   loadSessionCandidate() {
     try {
-      const stored = sessionStorage.getItem('sos_candidate_maneuver');
-      if (stored) {
-        this.candidateManeuver = JSON.parse(stored);
-        this.logMessage(`Loaded candidate avoidance maneuver ${this.candidateManeuver.id} from CAM Planner.`, '#00e5ff');
+      const stateCandidate = store.getState().candidateManeuver;
+      if (stateCandidate) {
+        this.candidateManeuver = stateCandidate;
+      } else {
+        const stored = sessionStorage.getItem('sos_candidate_maneuver');
+        if (stored) {
+          this.candidateManeuver = JSON.parse(stored);
+          store.setCandidateManeuver(this.candidateManeuver);
+        }
+      }
+      if (this.candidateManeuver) {
+        this.logMessage(`Loaded candidate avoidance maneuver ${this.candidateManeuver.id} (Δv=${this.candidateManeuver.deltaVMagnitudeMps || 0.85} m/s).`, '#00e5ff');
       }
     } catch (e) {
       console.warn('[Flight Director] Could not parse session candidate maneuver:', e);
+    }
+  }
+
+  async syncWorkflowStatus() {
+    try {
+      const res = await ApiClient.getWorkflowStatus();
+      if (res?.data?.currentState) {
+        store.setWorkflowState(res.data.currentState);
+        this.updateWorkflowStepper(res.data.currentState);
+        this.updateWorkflowCards(res.data.currentState, res.data.verificationStatus, res.data.burnResult);
+      }
+    } catch (err) {
+      console.warn('[Flight Director] Backend workflow sync error:', err.message);
+      this.updateWorkflowStepper(store.getState().workflowState);
     }
   }
 
@@ -40,19 +64,27 @@ class FlightDirectorController {
     const btnRetry = document.getElementById('btn-retry-assessment');
     const btnErrorRetry = document.getElementById('btn-error-retry');
     const btnToggleSource = document.getElementById('btn-toggle-source');
+    const btnClose = document.getElementById('btn-close-workflow');
+    const btnReopen = document.getElementById('btn-reopen-workflow');
 
     if (btnApprove) {
       btnApprove.addEventListener('click', () => this.executeSimulatedBurn());
     }
 
     if (btnAbort) {
-      btnAbort.addEventListener('click', () => {
-        this.logMessage('[ABORTED] Operator aborted maneuver workflow. Conjunction remains in critical observation.', '#ff334b');
-      });
+      btnAbort.addEventListener('click', () => this.abortWorkflow());
     }
 
     if (btnReset) {
       btnReset.addEventListener('click', () => this.resetWorkflow());
+    }
+
+    if (btnClose) {
+      btnClose.addEventListener('click', () => this.closeWorkflow());
+    }
+
+    if (btnReopen) {
+      btnReopen.addEventListener('click', () => this.resetWorkflow());
     }
 
     if (btnRetry) {
@@ -70,6 +102,105 @@ class FlightDirectorController {
         this.logMessage(`Evaluation mode switched: ${this.forceFallback ? 'Forced Deterministic Fallback' : 'AI Assistant Primary'}.`, '#ffd54f');
         this.loadAssessment();
       });
+    }
+
+    // Subscribe to state updates
+    store.subscribe((event, payload) => {
+      if (event === 'workflowStateChanged') {
+        this.updateWorkflowStepper(payload);
+      }
+    });
+  }
+
+  updateWorkflowStepper(state) {
+    const steps = [
+      { id: 'step-track', states: ['MONITORING', 'CONJUNCTION_DETECTED', 'ASSESSMENT_COMPLETE', 'MANEUVER_CANDIDATE_CREATED', 'AWAITING_OPERATOR_APPROVAL', 'SIMULATED_MANEUVER_EXECUTING', 'POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-detect', states: ['CONJUNCTION_DETECTED', 'ASSESSMENT_COMPLETE', 'MANEUVER_CANDIDATE_CREATED', 'AWAITING_OPERATOR_APPROVAL', 'SIMULATED_MANEUVER_EXECUTING', 'POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-assess', states: ['ASSESSMENT_COMPLETE', 'MANEUVER_CANDIDATE_CREATED', 'AWAITING_OPERATOR_APPROVAL', 'SIMULATED_MANEUVER_EXECUTING', 'POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-plan', states: ['MANEUVER_CANDIDATE_CREATED', 'AWAITING_OPERATOR_APPROVAL', 'SIMULATED_MANEUVER_EXECUTING', 'POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-approve', states: ['AWAITING_OPERATOR_APPROVAL', 'SIMULATED_MANEUVER_EXECUTING', 'POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-burn', states: ['SIMULATED_MANEUVER_EXECUTING', 'POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-verify', states: ['POST_MANEUVER_VERIFICATION_COMPLETE', 'CLOSED'] },
+      { id: 'step-close', states: ['CLOSED'] }
+    ];
+
+    const stateHierarchy = [
+      'MONITORING',
+      'CONJUNCTION_DETECTED',
+      'ASSESSMENT_COMPLETE',
+      'MANEUVER_CANDIDATE_CREATED',
+      'AWAITING_OPERATOR_APPROVAL',
+      'SIMULATED_MANEUVER_EXECUTING',
+      'POST_MANEUVER_VERIFICATION_COMPLETE',
+      'CLOSED'
+    ];
+
+    const currentIndex = stateHierarchy.indexOf(state);
+
+    steps.forEach((step, idx) => {
+      const el = document.getElementById(step.id);
+      if (!el) return;
+      const numEl = el.querySelector('.step-number');
+
+      if (state === 'FAILED_OR_BLOCKED') {
+        el.className = 'workflow-step';
+        if (numEl) numEl.textContent = (idx + 1).toString();
+        return;
+      }
+
+      if (currentIndex > idx) {
+        el.className = 'workflow-step completed';
+        if (numEl) numEl.textContent = '✓';
+      } else if (currentIndex === idx) {
+        el.className = 'workflow-step active';
+        if (numEl) numEl.textContent = (idx + 1).toString();
+      } else {
+        el.className = 'workflow-step';
+        if (numEl) numEl.textContent = (idx + 1).toString();
+      }
+    });
+
+    const simBadge = document.getElementById('sim-status-badge');
+    if (simBadge) {
+      simBadge.textContent = state;
+      if (state === 'SIMULATED_MANEUVER_EXECUTING') {
+        simBadge.className = 'badge badge-warning';
+      } else if (state === 'POST_MANEUVER_VERIFICATION_COMPLETE' || state === 'CLOSED') {
+        simBadge.className = 'badge badge-nominal';
+      } else if (state === 'FAILED_OR_BLOCKED') {
+        simBadge.className = 'badge badge-critical';
+      } else {
+        simBadge.className = 'badge badge-cyan';
+      }
+    }
+  }
+
+  updateWorkflowCards(state, verificationStatus, burnResult) {
+    const approvalCard = document.getElementById('operator-approval-card');
+    const clearanceCard = document.getElementById('post-burn-clearance-card');
+    const closedCard = document.getElementById('closed-workflow-card');
+
+    if (!approvalCard || !clearanceCard || !closedCard) return;
+
+    if (state === 'CLOSED') {
+      approvalCard.style.display = 'none';
+      clearanceCard.style.display = 'none';
+      closedCard.style.display = 'block';
+    } else if (state === 'POST_MANEUVER_VERIFICATION_COMPLETE') {
+      approvalCard.style.display = 'none';
+      clearanceCard.style.display = 'block';
+      closedCard.style.display = 'none';
+
+      if (burnResult) {
+        const summaryText = document.getElementById('clearance-summary-text');
+        if (summaryText) {
+          summaryText.textContent = `Simulated RCS pulse confirmed. New trajectory telemetry verified: Miss distance = ${burnResult.postBurnMissDistanceMeters.toLocaleString()} meters. Collision probability reduced to < 1.0e-09. Target safety criteria satisfied.`;
+        }
+      }
+    } else {
+      approvalCard.style.display = 'block';
+      clearanceCard.style.display = 'none';
+      closedCard.style.display = 'none';
     }
   }
 
@@ -89,12 +220,11 @@ class FlightDirectorController {
 
       this.logMessage(`Requesting Flight Director assessment for ${conjId} (Mode: ${this.forceFallback ? 'Fallback' : 'AI'})...`, '#64748b');
 
-      // Call evaluate endpoint
       const payload = {
         conjunctionId: conjId,
         satelliteId: satId,
         candidateManeuver: this.candidateManeuver,
-        workflowStage: this.workflowStage,
+        workflowStage: state.workflowState,
         forceFallback: this.forceFallback
       };
 
@@ -112,6 +242,9 @@ class FlightDirectorController {
       const srcLabel = this.currentAssessment.source === 'ai' ? 'AI Assistant' : 'Deterministic Fallback';
       this.logMessage(`Assessment evaluated successfully via [${srcLabel}]. Severity: ${this.currentAssessment.severity}.`, '#00e676');
 
+      // Auto-advance workflow state if appropriate
+      await this.advanceWorkflowAfterAssessment(conjId, satId);
+
     } catch (err) {
       console.error('[Flight Director Error]:', err);
       if (loadingEl) loadingEl.style.display = 'none';
@@ -121,6 +254,45 @@ class FlightDirectorController {
         if (msg) msg.textContent = err.message || 'Unknown network or service error.';
       }
       this.logMessage(`[ERROR] Assessment failure: ${err.message}`, '#ff334b');
+    }
+  }
+
+  async advanceWorkflowAfterAssessment(conjId, satId) {
+    const currentState = store.getState().workflowState;
+
+    if (currentState === 'MONITORING' || currentState === 'CONJUNCTION_DETECTED') {
+      try {
+        const transRes = await ApiClient.transitionWorkflow({
+          toState: 'ASSESSMENT_COMPLETE',
+          conjunctionId: conjId,
+          satelliteId: satId,
+          notes: 'Flight Director tactical assessment completed.'
+        });
+        if (transRes?.data?.currentState) {
+          store.setWorkflowState(transRes.data.currentState);
+        }
+      } catch (e) {
+        console.warn('[Flight Director] Transition error:', e.message);
+      }
+    }
+
+    // If candidate maneuver is already created, stage for operator approval
+    const updatedState = store.getState().workflowState;
+    if (this.candidateManeuver && (updatedState === 'ASSESSMENT_COMPLETE' || updatedState === 'MANEUVER_CANDIDATE_CREATED')) {
+      try {
+        const transRes = await ApiClient.transitionWorkflow({
+          toState: 'AWAITING_OPERATOR_APPROVAL',
+          conjunctionId: conjId,
+          satelliteId: satId,
+          candidateManeuver: this.candidateManeuver,
+          notes: 'Candidate avoidance maneuver staged and awaiting mandatory operator authorization.'
+        });
+        if (transRes?.data?.currentState) {
+          store.setWorkflowState(transRes.data.currentState);
+        }
+      } catch (e) {
+        console.warn('[Flight Director] Transition to approval error:', e.message);
+      }
     }
   }
 
@@ -214,103 +386,142 @@ class FlightDirectorController {
   }
 
   async executeSimulatedBurn() {
+    // Idempotency lock: prevent duplicate execution clicks
+    if (this.isExecuting) {
+      this.logMessage('[WARN] Execution lock active: Simulated burn sequence already running.', '#ffd54f');
+      return;
+    }
+    this.isExecuting = true;
+
     const btnApprove = document.getElementById('btn-approve-burn');
     const simBadge = document.getElementById('sim-status-badge');
-    
+
     if (btnApprove) {
       btnApprove.disabled = true;
-      btnApprove.textContent = 'EXECUTING SIMULATED SEQUENCE...';
+      btnApprove.textContent = 'SIMULATED BURN IN PROGRESS...';
     }
     if (simBadge) {
       simBadge.textContent = 'EXECUTING';
       simBadge.className = 'badge badge-warning';
     }
 
-    // Call approve endpoint
+    const state = store.getState();
+    const conjId = state.selectedConjunctionId || this.conjunctionId;
+    const satId = state.selectedSatelliteId || this.satelliteId;
+
     try {
-      const authRes = await ApiClient.approveFlightDirectorBurn({
-        conjunctionId: this.conjunctionId
+      this.logMessage('OPERATOR AUTHORIZATION CONFIRMED: Human-in-the-loop authorization key generated.', '#00e5ff');
+      await this.delay(500);
+
+      this.logMessage('SAFETY CHECK: Verifying candidate maneuver parameters and collision avoidance geometry...', '#cbd5e1');
+      await this.delay(600);
+
+      // Invoke server workflow simulated burn execution engine
+      const burnRes = await ApiClient.executeWorkflowBurn({
+        conjunctionId: conjId,
+        satelliteId: satId,
+        candidateManeuver: this.candidateManeuver,
+        simulatedBy: 'Flight Operations Console (HITL)'
       });
-      const authKey = authRes?.data?.authorizationKey || 'OP-AUTH-77291';
-      this.logMessage(`OPERATOR AUTHORIZATION CONFIRMED: Key ${authKey}.`, '#00e5ff');
-    } catch {
-      this.logMessage(`OPERATOR AUTHORIZATION CONFIRMED: Local simulated sign-off.`, '#00e5ff');
+
+      if (!burnRes || !burnRes.data) {
+        throw new Error(burnRes?.error || 'Simulated burn execution rejected by flight service.');
+      }
+
+      const resData = burnRes.data;
+      const burnResult = resData.burnResult;
+
+      this.logMessage(`ADCS Attitude Lock: Slew complete. Locked along-track burn vector (${burnResult.burnDirection}).`, '#cbd5e1');
+      await this.delay(600);
+
+      this.logMessage(`THRUSTER FIRING: Hydrazine monopropellant pulse Δv = ${burnResult.deltaVMagnitudeMps.toFixed(2)} m/s (Duration: ${burnResult.burnDurationSeconds}s)...`, '#ffd54f');
+      await this.delay(900);
+
+      this.logMessage(`CUTOFF CONFIRMED: Burn complete. Consumed ${burnResult.propellantConsumedKg.toFixed(3)} kg hydrazine. Post-burn reserve: ${burnResult.postBurnFuelKg.toFixed(2)} kg.`, '#00e676');
+      await this.delay(600);
+
+      this.logMessage(`GROUND TRACK VERIFICATION: Ground pass confirmed. Post-burn miss distance = ${burnResult.postBurnMissDistanceMeters.toLocaleString()} m.`, '#00e5ff');
+      this.logMessage(`POST-MANEUVER VERIFICATION COMPLETE: Target criteria satisfied (${resData.verificationStatus}).`, '#00e676');
+
+      // Update state store
+      store.setWorkflowState('POST_MANEUVER_VERIFICATION_COMPLETE');
+      this.updateWorkflowCards('POST_MANEUVER_VERIFICATION_COMPLETE', resData.verificationStatus, burnResult);
+
+    } catch (err) {
+      console.error('[Burn Execution Error]:', err);
+      this.logMessage(`[CRITICAL] Execution halted: ${err.message}`, '#ff334b');
+      store.setWorkflowState('FAILED_OR_BLOCKED');
+      if (btnApprove) {
+        btnApprove.disabled = false;
+        btnApprove.textContent = 'RETRY SIMULATED BURN →';
+      }
+    } finally {
+      this.isExecuting = false;
     }
-
-    await this.delay(600);
-    this.logMessage('ADCS Verification: Slew to prograde burn attitude locked (+12.4°, -1.2°).', '#cbd5e1');
-    await this.delay(700);
-
-    const dv = this.candidateManeuver ? this.candidateManeuver.deltaVMagnitudeMps : 0.85;
-    const fuel = this.candidateManeuver ? this.candidateManeuver.estimatedPropellantKg : 0.493;
-
-    this.logMessage(`THRUSTER FIRING: Hydrazine pulse initiated. Target ΔV = ${dv.toFixed(2)} m/s...`, '#ffd54f');
-    await this.delay(1100);
-
-    this.logMessage(`CUTOFF NOMINAL: Burn complete. Consumed ${fuel.toFixed(3)} kg fuel. Accelerometer confirmed.`, '#00e676');
-    await this.delay(600);
-
-    this.logMessage('Ground station pass confirmed (KSAT Svalbard): New orbit state accepted.', '#00e5ff');
-    this.logMessage('ENCOUNTER CLEARED: Relative miss distance increased beyond critical threshold.', '#00e676');
-
-    // Update Workflow Stage to CLEAR
-    this.workflowStage = 'CLEAR';
-
-    const stepBurn = document.getElementById('step-burn');
-    const stepClear = document.getElementById('step-clear');
-    if (stepBurn) {
-      stepBurn.className = 'workflow-step completed';
-      stepBurn.querySelector('.step-number').textContent = '✓';
-    }
-    if (stepClear) {
-      stepClear.className = 'workflow-step active completed';
-      stepClear.querySelector('.step-number').textContent = '✓';
-    }
-
-    // Toggle Panels
-    document.getElementById('operator-approval-card').style.display = 'none';
-    document.getElementById('post-burn-clearance-card').style.display = 'block';
-
-    if (simBadge) {
-      simBadge.textContent = 'CLEARED';
-      simBadge.className = 'badge badge-nominal';
-    }
-
-    // Re-evaluate assessment in cleared state
-    await this.loadAssessment();
   }
 
-  resetWorkflow() {
-    this.workflowStage = 'BURN';
+  async closeWorkflow() {
+    const state = store.getState();
+    const conjId = state.selectedConjunctionId || this.conjunctionId;
+    const satId = state.selectedSatelliteId || this.satelliteId;
 
-    const stepBurn = document.getElementById('step-burn');
-    const stepClear = document.getElementById('step-clear');
-    if (stepBurn) {
-      stepBurn.className = 'workflow-step active';
-      stepBurn.querySelector('.step-number').textContent = '5';
+    try {
+      this.logMessage(`Closing operational workflow for conjunction ${conjId}...`, '#64748b');
+      const res = await ApiClient.transitionWorkflow({
+        toState: 'CLOSED',
+        conjunctionId: conjId,
+        satelliteId: satId,
+        notes: 'Operator closed conjunction workflow after successful simulated maneuver verification.'
+      });
+      if (res?.data?.currentState) {
+        store.setWorkflowState(res.data.currentState);
+        this.updateWorkflowCards('CLOSED');
+        this.logMessage(`WORKFLOW CLOSED: Event archived in mission operations ledger.`, '#00e676');
+      }
+    } catch (err) {
+      console.error('[Close Workflow Error]:', err);
+      this.logMessage(`[ERROR] Failed to close workflow: ${err.message}`, '#ff334b');
     }
-    if (stepClear) {
-      stepClear.className = 'workflow-step';
-      stepClear.querySelector('.step-number').textContent = '6';
+  }
+
+  async abortWorkflow() {
+    const state = store.getState();
+    const conjId = state.selectedConjunctionId || this.conjunctionId;
+    const satId = state.selectedSatelliteId || this.satelliteId;
+
+    try {
+      await ApiClient.transitionWorkflow({
+        toState: 'FAILED_OR_BLOCKED',
+        conjunctionId: conjId,
+        satelliteId: satId,
+        notes: 'Operator explicitly aborted conjunction workflow at Gate 5.'
+      });
+      store.setWorkflowState('FAILED_OR_BLOCKED');
+      this.logMessage('[ABORTED] Operator aborted maneuver workflow. Conjunction remains in critical observation.', '#ff334b');
+    } catch (e) {
+      this.logMessage(`[ABORTED] Local abort recorded.`, '#ff334b');
     }
+  }
 
-    document.getElementById('operator-approval-card').style.display = 'block';
-    document.getElementById('post-burn-clearance-card').style.display = 'none';
+  async resetWorkflow() {
+    this.isExecuting = false;
+    try {
+      await ApiClient.resetWorkflow();
+      store.setWorkflowState('MONITORING');
+      this.updateWorkflowCards('MONITORING');
 
-    const btnApprove = document.getElementById('btn-approve-burn');
-    if (btnApprove) {
-      btnApprove.disabled = false;
-      btnApprove.textContent = 'OPERATOR AUTHORIZATION: EXECUTE SIMULATED BURN →';
+      const btnApprove = document.getElementById('btn-approve-burn');
+      if (btnApprove) {
+        btnApprove.disabled = false;
+        btnApprove.textContent = 'OPERATOR AUTHORIZATION: EXECUTE SIMULATED BURN →';
+      }
+
+      this.logMessage('Workflow reset to MONITORING. Baseline scenario preserved.', '#ffd54f');
+      await this.loadAssessment();
+    } catch (err) {
+      console.error('[Reset Workflow Error]:', err);
+      this.logMessage(`[ERROR] Reset failed: ${err.message}`, '#ff334b');
     }
-
-    const simBadge = document.getElementById('sim-status-badge');
-    if (simBadge) {
-      simBadge.textContent = 'STANDBY';
-      simBadge.className = 'badge badge-cyan';
-    }
-
-    this.logMessage('Workflow reset to Gate 5 (Burn Authorization).', '#ffd54f');
-    this.loadAssessment();
   }
 
   delay(ms) {

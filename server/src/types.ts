@@ -332,3 +332,76 @@ export const FlightDirectorOutputContractSchema = z.object({
 
 export type FlightDirectorOutputContract = z.infer<typeof FlightDirectorOutputContractSchema>;
 
+// ==========================================
+// 10. Operator Workflow Domain (Phase 7)
+// ==========================================
+export type WorkflowState = 
+  | 'MONITORING'
+  | 'CONJUNCTION_DETECTED'
+  | 'ASSESSMENT_COMPLETE'
+  | 'MANEUVER_CANDIDATE_CREATED'
+  | 'AWAITING_OPERATOR_APPROVAL'
+  | 'SIMULATED_MANEUVER_EXECUTING'
+  | 'POST_MANEUVER_VERIFICATION_COMPLETE'
+  | 'CLOSED'
+  | 'FAILED_OR_BLOCKED';
+
+export type WorkflowEventType =
+  | 'AI_ASSESSMENT'
+  | 'DETERMINISTIC_ASSESSMENT'
+  | 'CANDIDATE_SAVED'
+  | 'OPERATOR_APPROVAL'
+  | 'OPERATOR_DECLINED'
+  | 'SIMULATED_EXECUTION'
+  | 'VERIFICATION_COMPLETE'
+  | 'VERIFICATION_BLOCKED'
+  | 'WORKFLOW_RESET';
+
+export interface WorkflowTransitionRecord {
+  id: string;
+  fromState: WorkflowState;
+  toState: WorkflowState;
+  timestamp: string;
+  eventType: WorkflowEventType;
+  reason: string;
+  associatedSatelliteId: string;
+  associatedConjunctionId: string;
+  metadata?: Record<string, string | number | boolean>;
+}
+
+export interface WorkflowStatus {
+  currentState: WorkflowState;
+  selectedSatelliteId: string;
+  selectedConjunctionId: string;
+  hasCandidateManeuver: boolean;
+  operatorApproved: boolean;
+  burnExecuting: boolean;
+  verificationStatus: 'PENDING' | 'ILLUSTRATIVE_VERIFIED' | 'PHYSICAL_VERIFIED' | 'BLOCKED';
+  history: WorkflowTransitionRecord[];
+  lastUpdated: string;
+}
+
+export const WorkflowStateSchema = z.enum([
+  'MONITORING',
+  'CONJUNCTION_DETECTED',
+  'ASSESSMENT_COMPLETE',
+  'MANEUVER_CANDIDATE_CREATED',
+  'AWAITING_OPERATOR_APPROVAL',
+  'SIMULATED_MANEUVER_EXECUTING',
+  'POST_MANEUVER_VERIFICATION_COMPLETE',
+  'CLOSED',
+  'FAILED_OR_BLOCKED'
+]);
+
+export const WorkflowEventTypeSchema = z.enum([
+  'AI_ASSESSMENT',
+  'DETERMINISTIC_ASSESSMENT',
+  'CANDIDATE_SAVED',
+  'OPERATOR_APPROVAL',
+  'OPERATOR_DECLINED',
+  'SIMULATED_EXECUTION',
+  'VERIFICATION_COMPLETE',
+  'VERIFICATION_BLOCKED',
+  'WORKFLOW_RESET'
+]);
+

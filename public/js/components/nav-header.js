@@ -89,6 +89,9 @@ class SosNavHeader extends HTMLElement {
         </div>
         <div class="status-strip-right">
           <span class="status-strip-item">
+            <strong>WORKFLOW:</strong> <span class="badge badge-cyan" id="strip-workflow-badge">MONITORING</span>
+          </span>
+          <span class="status-strip-item">
             <strong>SPACE WEATHER:</strong> F10.7=138.2 | AP=4 (QUIET)
           </span>
           <span class="status-strip-item">
@@ -128,10 +131,37 @@ class SosNavHeader extends HTMLElement {
     this.unsubscribe = store.subscribe((event, payload) => {
       if (event === 'satelliteChanged') {
         this.updateActiveSatDisplay(payload);
+      } else if (event === 'workflowStateChanged') {
+        this.updateWorkflowDisplay(payload);
       }
     });
 
     this.updateActiveSatDisplay(store.getState().selectedSatelliteId);
+    this.updateWorkflowDisplay(store.getState().workflowState);
+
+    // Initial sync with backend workflow status
+    ApiClient.getWorkflowStatus().then(res => {
+      if (res?.data?.currentState) {
+        store.setWorkflowState(res.data.currentState);
+      }
+    }).catch(() => {});
+  }
+
+  updateWorkflowDisplay(state) {
+    const badge = this.querySelector('#strip-workflow-badge');
+    if (!badge || !state) return;
+    badge.textContent = state;
+    if (state === 'SIMULATED_MANEUVER_EXECUTING') {
+      badge.className = 'badge badge-warning';
+    } else if (state === 'POST_MANEUVER_VERIFICATION_COMPLETE' || state === 'CLOSED') {
+      badge.className = 'badge badge-nominal';
+    } else if (state === 'FAILED_OR_BLOCKED') {
+      badge.className = 'badge badge-critical';
+    } else if (state === 'AWAITING_OPERATOR_APPROVAL') {
+      badge.className = 'badge badge-warning';
+    } else {
+      badge.className = 'badge badge-cyan';
+    }
   }
 
   async updateActiveSatDisplay(satId) {
