@@ -478,3 +478,15 @@ html, body {
   max-width: 360px;
   margin-bottom: 12px;
 }
+
+/* Keyboard accessibility & visible focus states */
+:focus-visible {
+  outline: 2px solid var(--color-cyan) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 2px solid var(--color-cyan) !important;
+  outline-offset: 2px !important;
+}
+
