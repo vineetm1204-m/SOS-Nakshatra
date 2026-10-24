@@ -2,12 +2,12 @@
   "name": "sos-safe-orbit-for-satellites",
   "version": "1.0.0",
   "description": "Safe Orbit for Satellites (SOS) — Aerospace Space Situational Awareness and Conjunction Operations Console",
-  "main": "server/dist/index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "dev": "tsx watch server/src/index.ts",
     "build": "tsc -p server/tsconfig.json",
-    "start": "node server/dist/index.js",
+    "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p server/tsconfig.json",
     "lint": "tsc --noEmit -p server/tsconfig.json"

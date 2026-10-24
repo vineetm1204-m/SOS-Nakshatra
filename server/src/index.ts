@@ -49,7 +49,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // Serve frontend static files from public/
-const publicDir = path.resolve(__dirname, '../../public');
+const publicDir = path.resolve(process.cwd(), 'public');
 app.use(express.static(publicDir));
 
 // --- API ROUTES ---
