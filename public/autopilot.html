@@ -66,6 +66,96 @@
       color: #000;
       border-color: var(--color-cyan);
     }
+
+    /* Evidence and Assumptions Lists */
+    .evidence-list, .assumptions-list {
+      list-style: none;
+      padding-left: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 0.75rem;
+    }
+    .evidence-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+    .evidence-icon {
+      color: var(--color-cyan);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .assumption-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+    .assumption-icon {
+      color: #ffd54f;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* Source Badge */
+    .source-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 8px;
+      border-radius: var(--border-radius-xs);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .source-badge.ai {
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid var(--color-cyan);
+      color: var(--color-cyan);
+    }
+    .source-badge.fallback {
+      background: rgba(255, 179, 0, 0.15);
+      border: 1px solid var(--color-advisory);
+      color: #ffd54f;
+    }
+
+    /* Recommendation Box */
+    .recommendation-card {
+      background: rgba(0, 229, 255, 0.08);
+      border-left: 4px solid var(--color-cyan);
+      border-radius: var(--border-radius-xs);
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+    .recommendation-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--color-cyan);
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .recommendation-body {
+      font-size: 0.85rem;
+      color: #fff;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    /* Loading and Error states */
+    .loading-pulse {
+      animation: pulse-glow 1.5s infinite alternate;
+    }
+    @keyframes pulse-glow {
+      from { opacity: 0.6; }
+      to { opacity: 1.0; }
+    }
   </style>
 </head>
 <body class="app-shell">
@@ -75,16 +165,22 @@
     <section class="page-header">
       <div class="page-title-group">
         <h1>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
           </svg>
-          Flight Director &amp; Autonomous Conjunction Workflow
+          Flight Director &amp; AI Decision Support Assistant
         </h1>
-        <p>Operational execution pipeline: TRACK → DETECT → ASSESS → PLAN → BURN → CLEAR with mandatory operator gate.</p>
+        <p>Operational workflow pipeline with domain-grounded evidence analysis, risk evaluation, and mandatory human-in-the-loop sign-off gate.</p>
       </div>
-      <div class="page-actions">
-        <button class="btn btn-secondary" id="btn-reset-workflow">
-          RESET SIMULATION WORKFLOW
+      <div class="page-actions" style="display: flex; gap: 8px;">
+        <button class="btn btn-secondary" id="btn-toggle-source" title="Toggle between AI Provider and Deterministic Fallback Engine">
+          ⚙️ SWITCH TO FALLBACK
+        </button>
+        <button class="btn btn-secondary" id="btn-retry-assessment" title="Re-evaluate assessment with latest telemetry">
+          ↺ RETRY ASSESSMENT
+        </button>
+        <button class="btn btn-secondary" id="btn-reset-workflow" title="Reset simulation workflow to Burn Gate">
+          RESET WORKFLOW
         </button>
       </div>
     </section>
@@ -111,7 +207,7 @@
         <span class="step-number">✓</span>
         <div>
           <div style="font-size: 0.75rem; text-transform: uppercase;">3. ASSESS</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">Miss: 184m (Critical)</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">Risk Evaluated</div>
         </div>
       </div>
 
@@ -119,7 +215,7 @@
         <span class="step-number">✓</span>
         <div>
           <div style="font-size: 0.75rem; text-transform: uppercase;">4. PLAN</div>
-          <div style="font-size: 0.68rem; color: var(--text-secondary);">ΔV Target: 0.85 m/s</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">CAM Staged</div>
         </div>
       </div>
 
@@ -141,59 +237,97 @@
     </section>
 
     <!-- Operational Split -->
-    <div class="ops-grid">
+    <div class="ops-grid" style="grid-template-columns: 1.4fr 1fr;">
+      
       <!-- Left: Flight Director Advisory Assessment -->
       <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Main Assessment Card -->
         <div class="ops-panel">
-          <div class="panel-header">
-            <span class="panel-title">Flight Director Tactical Assessment</span>
-            <span class="badge badge-critical" id="fd-threat-badge">INTERVENTION REQUIRED</span>
+          <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="panel-title">Flight Director Tactical Assessment</span>
+              <span class="source-badge fallback" id="fd-source-badge">⚙️ DETERMINISTIC FALLBACK</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="badge badge-warning" id="fd-operator-review-badge">OPERATOR REVIEW REQUIRED</span>
+              <span class="badge badge-critical" id="fd-severity-badge">CRITICAL</span>
+            </div>
           </div>
 
           <div class="panel-body">
-            <div style="background: var(--bg-surface-raised); border-left: 3px solid var(--color-cyan); padding: 12px 14px; margin-bottom: 16px; border-radius: var(--border-radius-xs);">
-              <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">
-                EXPERT SYSTEM EVALUATION &amp; DECISION DIRECTIVE
-              </div>
-              <p style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;" id="fd-assessment-text">
-                Primary asset <strong>SENTINEL-X</strong> is on a confirmed collision course with Cosmos-2251 debris fragment #23419. 
-                Time to TCA is <strong>04h 18m</strong>. The proposed maneuver (ΔV = +0.85 m/s in-track) increases miss distance to 2,450 meters 
-                and reduces collision probability from 4.82e-03 to &lt; 1.0e-07. Propellant expenditure (0.49 kg) is within safe operational reserves.
-              </p>
+            
+            <!-- Loading Indicator -->
+            <div id="fd-loading-state" style="display: none; padding: 24px; text-align: center;" class="loading-pulse">
+              <div style="color: var(--color-cyan); font-weight: 700; margin-bottom: 6px;">EVALUATING CONJUNCTION STATE...</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">Analyzing orbital telemetry, covariance geometry, and staged candidate maneuver.</div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
-              <div class="metric-card">
-                <span class="metric-label">Rule-Based Determinism</span>
-                <span class="metric-value mono" style="font-size: 1.25rem; color: var(--color-nominal);">100%</span>
-                <span class="metric-subtext">Zero hallucination</span>
-              </div>
-              <div class="metric-card">
-                <span class="metric-label">Clearance Verification</span>
-                <span class="metric-value mono" style="font-size: 1.25rem; color: var(--color-nominal);">PASSED</span>
-                <span class="metric-subtext">No secondary conjs</span>
-              </div>
-              <div class="metric-card">
-                <span class="metric-label">Execution Readiness</span>
-                <span class="metric-value mono" style="font-size: 1.25rem; color: #ffd54f;">AWAITING OP</span>
-                <span class="metric-subtext">Gate 5 pending</span>
-              </div>
+            <!-- Error Banner -->
+            <div id="fd-error-state" style="display: none; background: rgba(255, 51, 75, 0.12); border: 1px solid var(--color-critical); border-radius: var(--border-radius-xs); padding: 12px; margin-bottom: 16px;">
+              <strong style="color: var(--color-critical); font-size: 0.8rem;">ASSESSMENT EVALUATION ERROR:</strong>
+              <div id="fd-error-message" style="font-size: 0.75rem; color: #cbd5e1; margin-top: 4px;"></div>
+              <button class="btn btn-secondary" id="btn-error-retry" style="margin-top: 8px; font-size: 0.7rem; padding: 4px 10px;">RETRY EVALUATION</button>
             </div>
 
-            <!-- Operator Approval Action Gate Card -->
+            <!-- Assessment Content Container -->
+            <div id="fd-content-container">
+              
+              <!-- Executive Summary -->
+              <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); padding: 14px; margin-bottom: 16px; border-radius: var(--border-radius-xs);">
+                <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">
+                  EXECUTIVE ASSESSMENT SUMMARY
+                </div>
+                <p style="font-size: 0.88rem; color: #fff; line-height: 1.5; font-weight: 500;" id="fd-summary-text">
+                  Primary asset SENTINEL-X is on a confirmed collision course with Cosmos 1408 debris. Miss distance of 184m is below the 500m mission threshold in T-03h 28m.
+                </p>
+              </div>
+
+              <!-- Recommendation Card -->
+              <div class="recommendation-card">
+                <div class="recommendation-title">RECOMMENDED NEXT OPERATOR ACTION</div>
+                <div class="recommendation-body" id="fd-recommendation-text">
+                  Operator review required: Stage and evaluate candidate maneuver in CAM Planner with along-track prograde impulse. Detailed maneuver parameters required before burn authorization.
+                </div>
+              </div>
+
+              <!-- Evidence Audit List -->
+              <div style="margin-bottom: 16px;">
+                <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 8px;">
+                  SUPPORTING FACTUAL EVIDENCE (DOMAIN GROUNDS)
+                </div>
+                <ul class="evidence-list" id="fd-evidence-list">
+                  <!-- Populated dynamically -->
+                </ul>
+              </div>
+
+              <!-- Assumptions and Limitations -->
+              <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 12px; margin-bottom: 16px;">
+                <div style="font-size: 0.72rem; text-transform: uppercase; color: #ffd54f; font-weight: 700; margin-bottom: 8px;">
+                  ASSUMPTIONS, UNCERTAINTIES &amp; LIMITATIONS
+                </div>
+                <ul class="assumptions-list" id="fd-assumptions-list">
+                  <!-- Populated dynamically -->
+                </ul>
+              </div>
+
+            </div>
+
+            <!-- Operator Approval Action Gate Card (Gate 5) -->
             <div id="operator-approval-card" style="background: rgba(255, 51, 75, 0.08); border: 1px solid var(--color-critical); border-radius: var(--border-radius-sm); padding: 16px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <strong style="color: #fff; font-size: 0.95rem;">MANDATORY OPERATOR SIGN-OFF GATE</strong>
                 <span class="badge badge-critical">GATE 5 ACTIVE</span>
               </div>
-              <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 14px;">
-                In accordance with orbital safety doctrine, simulated burn commands cannot execute without explicit operator authorization. Confirm parameter review.
+              <p style="font-size: 0.75rem; color: #cbd5e1; margin-bottom: 12px;">
+                <strong>SAFETY BOUNDARY:</strong> The Flight Director provides advisory evaluation. In strict accordance with spaceflight safety doctrine, burn commands cannot execute autonomously without explicit operator sign-off.
               </p>
+              
               <div style="display: flex; gap: 12px; align-items: center;">
                 <button class="btn btn-critical" id="btn-approve-burn">
                   OPERATOR AUTHORIZATION: EXECUTE SIMULATED BURN →
                 </button>
-                <button class="btn btn-secondary" id="btn-abort-burn">ABORT PLAN</button>
+                <button class="btn btn-secondary" id="btn-abort-burn">ABORT WORKFLOW</button>
               </div>
             </div>
 
@@ -207,12 +341,13 @@
                 <span class="badge badge-nominal">SAFE CLEARANCE</span>
               </div>
               <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 12px;" id="clearance-summary-text">
-                Simulated RCS pulse confirmed. New trajectory telemetry verified: Miss distance = 2,450 meters. Collision probability reduced to &lt; 1.0e-07. Event promoted to CLEARED status.
+                Simulated RCS pulse confirmed. New trajectory telemetry verified: Miss distance = 23,115 meters. Collision probability reduced to &lt; 1.0e-09. Event promoted to CLEARED status.
               </p>
               <div style="font-size: 0.7rem; color: #94a3b8; border-top: 1px solid rgba(0, 230, 118, 0.2); padding-top: 8px;">
                 SIMULATION NOTICE: This is a verified simulated operational workflow for test and validation.
               </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -221,17 +356,16 @@
       <div style="display: flex; flex-direction: column; gap: 16px;">
         <div class="ops-panel">
           <div class="panel-header">
-            <span class="panel-title">Execution Telemetry Stream</span>
+            <span class="panel-title">Operational Telemetry &amp; Audit Stream</span>
             <span class="badge badge-cyan" id="sim-status-badge">STANDBY</span>
           </div>
-          <div class="panel-body" style="background: #05080e; font-family: var(--font-mono); font-size: 0.72rem; padding: 12px; height: 320px; overflow-y: auto;" id="exec-log-console">
-            <div style="color: #64748b;">[08:52:10 UTC] Flight Director initialized. Tracking 5 fleet assets.</div>
-            <div style="color: #ffd54f;">[08:52:14 UTC] Conjunction S-2026-084 flagged. Screening window active.</div>
-            <div style="color: #00e5ff;">[08:52:20 UTC] Avoidance plan loaded: ΔV = 0.85 m/s In-Track.</div>
-            <div style="color: #fff; font-weight: 700;">[AWAITING] Operator sign-off required on Gate 5.</div>
+          <div class="panel-body" style="background: #05080e; font-family: var(--font-mono); font-size: 0.72rem; padding: 12px; height: 520px; overflow-y: auto;" id="exec-log-console">
+            <div style="color: #64748b;">[INIT] Flight Director workspace online.</div>
+            <div style="color: #64748b;">[AUDIT] Human-in-the-loop authorization barrier active.</div>
           </div>
         </div>
       </div>
+
     </div>
   </main>
 

@@ -319,3 +319,16 @@ export const ManeuverCandidateSchema = z.object({
   assumptions: z.array(z.string()),
   status: z.enum(['DRAFT', 'APPROVED', 'EXECUTING', 'COMPLETED', 'ABORTED'])
 });
+
+export const FlightDirectorOutputContractSchema = z.object({
+  summary: z.string().min(1, 'Summary must not be empty'),
+  severity: z.enum(['INFO', 'WARNING', 'CRITICAL']),
+  evidence: z.array(z.string()).min(1, 'At least one evidence claim is required'),
+  recommendation: z.string().min(1, 'Recommendation must not be empty'),
+  assumptions: z.array(z.string()),
+  source: z.enum(['ai', 'deterministic_fallback']),
+  requires_operator_review: z.boolean()
+});
+
+export type FlightDirectorOutputContract = z.infer<typeof FlightDirectorOutputContractSchema>;
+

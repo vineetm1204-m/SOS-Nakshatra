@@ -100,8 +100,16 @@ export class ApiClient {
     return this.post('/maneuvers/reset', {});
   }
 
-  static async getFlightDirectorAssessment(conjunctionId) {
-    return this.get(`/flight-director/assessment/${encodeURIComponent(conjunctionId)}`);
+  static async getFlightDirectorAssessment(conjunctionId, queryParams = {}) {
+    return this.get(`/flight-director/assessment/${encodeURIComponent(conjunctionId)}`, queryParams);
+  }
+
+  static async evaluateFlightDirector(payload) {
+    return this.post('/flight-director/evaluate', payload);
+  }
+
+  static async approveFlightDirectorBurn(payload) {
+    return this.post('/flight-director/approve', payload);
   }
 
   static async getEvents(filters = {}) {

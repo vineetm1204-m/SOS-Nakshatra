@@ -4,11 +4,13 @@ import helmet from 'helmet';
 import path from 'path';
 import { scenarioRepository } from './services/ScenarioRepository.js';
 import { ManeuverService } from './services/ManeuverService.js';
+import { FlightDirectorService } from './services/FlightDirectorService.js';
 import { DEFAULT_SETTINGS } from './data/seedData.js';
 import { FleetSummary, SystemSettings } from './types.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const flightDirectorService = new FlightDirectorService();
 
 // In-memory operational settings
 let settings: SystemSettings = { ...DEFAULT_SETTINGS };
@@ -204,14 +206,93 @@ app.post('/api/v1/maneuvers/reset', async (_req: Request, res: Response) => {
   }
 });
 
-// 7. Flight Director Assessment
+// 7. Flight Director Assessment & AI Evaluation Engine
 app.get('/api/v1/flight-director/assessment/:conjunctionId', async (req: Request, res: Response) => {
-  const assessment = await scenarioRepository.getFlightDirectorAssessment(req.params.conjunctionId);
-  if (!assessment) {
-    res.status(404).json({ error: `Flight director assessment for conjunction '${req.params.conjunctionId}' not found.` });
-    return;
+  try {
+    const conjId = req.params.conjunctionId;
+    const conjunction = await scenarioRepository.getConjunctionById(conjId) || await scenarioRepository.getFeaturedConjunction();
+    const satellite = await scenarioRepository.getSatelliteById(conjunction.primarySatelliteId);
+    const candidateManeuver = await scenarioRepository.getCandidateManeuver(conjunction.id);
+    const recentEvents = await scenarioRepository.getEvents({ limit: 5 });
+
+    if (!satellite) {
+      res.status(404).json({ error: `Satellite for conjunction '${conjId}' not found.` });
+      return;
+    }
+
+    const assessment = await flightDirectorService.evaluate({
+      satellite,
+      conjunction,
+      candidateManeuver,
+      workflowStage: (req.query.stage as string) || 'BURN',
+      recentEvents,
+      systemSettings: settings,
+      forceFallback: req.query.forceFallback === 'true'
+    });
+
+    res.json({ data: assessment });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Flight Director evaluation failed.' });
   }
-  res.json({ data: assessment });
+});
+
+app.post('/api/v1/flight-director/evaluate', async (req: Request, res: Response) => {
+  try {
+    const { 
+      conjunctionId, 
+      satelliteId, 
+      candidateManeuver, 
+      workflowStage, 
+      forceFallback, 
+      simulateTimeout, 
+      simulateMalformedAiResponse,
+      mockAiResponse 
+    } = req.body;
+
+    const conjunction = (conjunctionId ? await scenarioRepository.getConjunctionById(conjunctionId) : null) || await scenarioRepository.getFeaturedConjunction();
+    const satellite = (satelliteId ? await scenarioRepository.getSatelliteById(satelliteId) : null) || await scenarioRepository.getSatelliteById(conjunction.primarySatelliteId);
+    const candidate = candidateManeuver !== undefined ? candidateManeuver : await scenarioRepository.getCandidateManeuver(conjunction.id);
+    const recentEvents = await scenarioRepository.getEvents({ limit: 5 });
+
+    if (!satellite) {
+      res.status(404).json({ error: `Target satellite not found.` });
+      return;
+    }
+
+    const assessment = await flightDirectorService.evaluate({
+      satellite,
+      conjunction,
+      candidateManeuver: candidate,
+      workflowStage: workflowStage || 'BURN',
+      recentEvents,
+      systemSettings: settings,
+      forceFallback: !!forceFallback,
+      simulateTimeout: !!simulateTimeout,
+      simulateMalformedAiResponse: !!simulateMalformedAiResponse,
+      mockAiResponse
+    });
+
+    res.json({ data: assessment });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Flight Director evaluation failed.' });
+  }
+});
+
+app.post('/api/v1/flight-director/approve', async (req: Request, res: Response) => {
+  try {
+    const { conjunctionId, authorizationKey } = req.body;
+    res.json({
+      data: {
+        approvalStatus: 'AUTHORIZED',
+        conjunctionId: conjunctionId || 'CONJ-2026-084',
+        authorizationKey: authorizationKey || `OP-AUTH-${Math.floor(10000 + Math.random() * 90000)}`,
+        timestamp: new Date().toISOString(),
+        message: 'Simulated operator sign-off confirmed. Burn gate cleared for execution.'
+      }
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to authorize burn.' });
+  }
 });
 
 // 8. Operational Events
