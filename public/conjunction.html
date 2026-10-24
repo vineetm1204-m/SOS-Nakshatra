@@ -20,7 +20,7 @@
           <span class="status-dot critical"></span>
           Conjunction Analysis &amp; TCA Geometry
         </h1>
-        <p>Close approach screening, miss-distance vectors, and collision probability modeling.</p>
+        <p>Close approach screening, miss-distance vectors, uncertainty covariance, and formal collision probability modeling.</p>
       </div>
       <div class="page-actions">
         <button class="btn btn-secondary" id="btn-refresh-conjunctions">
@@ -32,7 +32,7 @@
     <!-- Conjunction Selector Ribbon -->
     <div class="filter-bar" style="background: var(--bg-surface); padding: 10px 14px; border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm);">
       <div class="filter-group">
-        <span class="metric-label">ACTIVE EVENTS:</span>
+        <span class="metric-label">ACTIVE SCREENING EVENTS:</span>
         <div id="conj-event-buttons" style="display: flex; gap: 8px;">
           <!-- Dynamically populated -->
         </div>
@@ -44,7 +44,7 @@
 
     <!-- Main Conjunction Analysis Grid -->
     <div class="ops-grid" style="margin-top: 16px;">
-      <!-- Left Column: Encounter Geometry & Geometry Vector Breakdown -->
+      <!-- Left Column: Encounter Metrics, Visual Geometry Canvas, and Vector Breakdown -->
       <div style="display: flex; flex-direction: column; gap: 16px;">
         
         <!-- Encounter Geometry Metrics -->
@@ -52,7 +52,7 @@
           <div class="metric-card critical">
             <span class="metric-label">Total Miss Distance</span>
             <span class="metric-value" id="conj-metric-miss">-- m</span>
-            <span class="metric-subtext" style="color: #ff526b;">Threshold: 500 m</span>
+            <span class="metric-subtext" style="color: #ff526b;">Safety Threshold: 500 m</span>
           </div>
 
           <div class="metric-card critical">
@@ -74,7 +74,7 @@
           </div>
         </div>
 
-        <!-- 3-Component Miss Distance Vector & Covariance Panel -->
+        <!-- Visual Representation of Encounter Geometry (Hill / CW Canvas) -->
         <div class="ops-panel">
           <div class="panel-header">
             <span class="panel-title">
@@ -83,6 +83,23 @@
                 <line x1="12" y1="2" x2="12" y2="22"/>
                 <line x1="2" y1="12" x2="22" y2="12"/>
               </svg>
+              Encounter Plane Geometry &amp; 3-Sigma Covariance Ellipse
+            </span>
+            <span class="badge badge-neutral">HILL / CLOHESSY-WILTSHIRE FRAME</span>
+          </div>
+          <div class="panel-body" style="padding: 0; position: relative; height: 260px; background: #04060a;">
+            <canvas id="encounter-plane-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+            <div style="position: absolute; bottom: 6px; left: 12px; right: 12px; display: flex; justify-content: space-between; font-size: 0.65rem; font-family: var(--font-mono); color: var(--text-muted); pointer-events: none;">
+              <span>ORIGIN: PROTECTED SATELLITE (0, 0)</span>
+              <span>SCALE: 1 PX = 1.25 METERS | COVARIANCE: 3-SIGMA B-PLANE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3-Component Miss Distance Vector & Covariance Panel -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">
               Encounter Frame Miss Distance Vector (RIC Coordinates)
             </span>
             <span class="badge badge-neutral">RADIAL / IN-TRACK / CROSS-TRACK</span>
@@ -93,7 +110,7 @@
               <div class="metric-card">
                 <span class="metric-label">Radial Separation (ΔR)</span>
                 <span class="metric-value" id="vector-radial" style="font-size: 1.3rem;">-- m</span>
-                <span class="metric-subtext">Height difference</span>
+                <span class="metric-subtext">Altitude difference</span>
               </div>
               <div class="metric-card">
                 <span class="metric-label">In-Track Separation (ΔT)</span>
@@ -107,13 +124,16 @@
               </div>
             </div>
 
-            <!-- Provenance & Covariance Note -->
+            <!-- Risk Rule & Uncertainty Audit -->
             <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 12px;">
-              <div style="font-weight: 600; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-                <span class="status-dot warning"></span>
-                <span>Uncertainty Covariance &amp; Mathematical Assumptions</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-weight: 700; color: #fff; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                  <span class="status-dot critical"></span>
+                  Risk Classification Rule: <span id="risk-rule-name" class="mono" style="color: #ff526b;">CARA_PC_REDLINE</span>
+                </span>
+                <span class="badge badge-neutral" id="risk-rule-type">FORMAL PROBABILITY</span>
               </div>
-              <p style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45;" id="conj-covariance-notes">
+              <p style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.45;" id="conj-covariance-notes">
                 Collision probability computed using Akella-Alfriend 2D encounter plane projection under Gaussian state uncertainty assumptions. Combined hard-body radius: 5.0m.
               </p>
             </div>
@@ -137,7 +157,7 @@
             <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle);">
               <span class="metric-label" style="color: var(--color-cyan);">PRIMARY PROTECTED ASSET</span>
               <h3 style="font-size: 1.1rem; color: #fff; margin-top: 2px;" id="pair-primary-name">SENTINEL-X</h3>
-              <div style="font-size: 0.72rem; color: var(--text-secondary);" id="pair-primary-id">ID: SAT-LEO-02 | NORAD: 49211</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary);" id="pair-primary-id">ID: SAT-LEO-02 | NORAD: 49211 | TYPE: PAYLOAD</div>
             </div>
 
             <!-- Secondary Intersecting Object -->
@@ -147,10 +167,10 @@
               <div style="font-size: 0.72rem; color: var(--text-secondary);" id="pair-secondary-id">DEBRIS FRAGMENT #23419 | RCS: 0.12 m²</div>
             </div>
 
-            <!-- Recommended Operational Action -->
+            <!-- Recommended Next Step Directive -->
             <div style="background: rgba(255, 51, 75, 0.1); border: 1px solid var(--color-critical); border-radius: var(--border-radius-xs); padding: 12px; margin-bottom: 16px;">
-              <strong style="color: #ff526b; font-size: 0.8rem; display: block; margin-bottom: 4px;">OPERATOR ACTION MANDATED</strong>
-              <p style="font-size: 0.75rem; color: #f8fafc;">
+              <strong style="color: #ff526b; font-size: 0.8rem; display: block; margin-bottom: 4px;">RECOMMENDED OPERATIONAL DIRECTIVE</strong>
+              <p style="font-size: 0.75rem; color: #f8fafc;" id="recommended-next-step-text">
                 Predicted miss distance (184m) violates safety threshold (500m). Collision avoidance burn must be calculated and uploaded prior to burn decision deadline (T-02h 00m).
               </p>
             </div>
@@ -166,10 +186,10 @@
           </div>
         </div>
 
-        <!-- Data Provenance Card -->
+        <!-- Data Provenance & Freshness Card -->
         <div class="ops-panel">
           <div class="panel-header">
-            <span class="panel-title">Data Provenance &amp; Tracking Feed</span>
+            <span class="panel-title">Data Freshness &amp; Provenance</span>
           </div>
           <div class="panel-body" style="font-size: 0.75rem; color: var(--text-secondary);">
             <div style="margin-bottom: 6px;">
@@ -178,8 +198,11 @@
             <div style="margin-bottom: 6px;">
               <strong style="color: var(--text-primary);">Provider:</strong> <span id="provenance-provider">SSN-Sim Conjunction Network</span>
             </div>
+            <div style="margin-bottom: 6px;">
+              <strong style="color: var(--text-primary);">Model Confidence:</strong> <span id="provenance-confidence" class="mono">96.0%</span>
+            </div>
             <div>
-              <strong style="color: var(--text-primary);">Confidence:</strong> <span id="provenance-confidence" class="mono">96.0%</span>
+              <strong style="color: var(--text-primary);">Covariance Status:</strong> <span id="provenance-covariance-status" class="mono" style="color: #00e676;">HIGH_CONFIDENCE (2D B-PLANE)</span>
             </div>
           </div>
         </div>

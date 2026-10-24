@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOS — Fleet Tracking & Satellite Telemetry</title>
+  <title>SOS — Fleet Tracking & Spacecraft Telemetry</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,9 +21,9 @@
             <circle cx="12" cy="12" r="10"/>
             <polygon points="12 8 8 12 12 16 16 12 12 8"/>
           </svg>
-          Fleet Tracking & Spacecraft Telemetry
+          Space Object Tracking &amp; Ephemeris Telemetry
         </h1>
-        <p>Real-time orbital tracking, subsystem health diagnostics, and propellant telemetry.</p>
+        <p>Real-time orbital tracking, state vectors (ECI J2000), subsystem diagnostics, and data freshness validation.</p>
       </div>
       <div class="page-actions">
         <button class="btn btn-secondary" id="btn-refresh-fleet">
@@ -44,7 +44,14 @@
       </div>
 
       <div class="filter-group">
-        <input type="text" class="search-input" id="fleet-search-input" placeholder="Search by name, NORAD..." aria-label="Search satellites">
+        <span class="metric-label" style="margin-right: 4px;">DATA STATUS:</span>
+        <button class="filter-btn data-status-btn active" data-status="ALL">ALL</button>
+        <button class="filter-btn data-status-btn" data-status="VALID">VALID</button>
+        <button class="filter-btn data-status-btn" data-status="DEGRADED">DEGRADED / STALE</button>
+      </div>
+
+      <div class="filter-group">
+        <input type="text" class="search-input" id="fleet-search-input" placeholder="Search by name, NORAD, ID..." aria-label="Search satellites">
         <button class="btn btn-secondary btn-sm" id="btn-clear-search">CLEAR</button>
       </div>
     </section>
@@ -53,20 +60,20 @@
     <div class="ops-grid">
       <div class="ops-panel">
         <div class="panel-header">
-          <span class="panel-title">Active Constellation Assets</span>
+          <span class="panel-title">Tracked Constellation Assets &amp; Space Bodies</span>
           <span class="badge badge-neutral" id="fleet-count-badge">5 Tracked</span>
         </div>
         <div class="panel-body" style="padding: 0; overflow-x: auto;">
           <table class="ops-table" aria-label="Fleet Tracking Registry">
             <thead>
               <tr>
-                <th>Status</th>
+                <th>Ops Status</th>
+                <th>Data Freshness</th>
                 <th>Asset / Callsign</th>
                 <th>NORAD ID</th>
-                <th>Orbit Class</th>
+                <th>Type</th>
                 <th>Altitude</th>
                 <th>Fuel Reserve</th>
-                <th>Last Pass</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -87,13 +94,13 @@
       <!-- Focused Spacecraft Telemetry Panel -->
       <div class="ops-panel">
         <div class="panel-header">
-          <span class="panel-title">Asset Telemetry Diagnostics</span>
+          <span class="panel-title">Asset Telemetry &amp; State Vector</span>
           <span class="badge" id="focus-sat-status-badge">--</span>
         </div>
         <div class="panel-body" id="focus-sat-details">
           <div class="state-container">
             <div class="state-title">Select a Satellite</div>
-            <div class="state-desc">Click any spacecraft in the registry to inspect full orbital telemetry.</div>
+            <div class="state-desc">Click any spacecraft in the registry to inspect full orbital telemetry and state vectors.</div>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 /**
  * SOS Fleet Tracking Controller (tracking.js)
+ * Implements searchable satellite list, data freshness, state vectors (ECI J2000), and degraded data states.
  */
 import { ApiClient } from '../api.js';
 import { store } from '../state.js';
@@ -8,6 +9,7 @@ class TrackingPageController {
   constructor() {
     this.satellites = [];
     this.activeOrbitFilter = 'ALL';
+    this.activeStatusFilter = 'ALL';
     this.searchQuery = '';
   }
 
@@ -17,6 +19,7 @@ class TrackingPageController {
   }
 
   initEventListeners() {
+    // Orbit Class Filters
     const orbitBtns = document.querySelectorAll('.fleet-orbit-btn');
     orbitBtns.forEach(btn => {
       btn.addEventListener('click', () => {
@@ -27,6 +30,18 @@ class TrackingPageController {
       });
     });
 
+    // Data Status Filters
+    const statusBtns = document.querySelectorAll('.data-status-btn');
+    statusBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        statusBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.activeStatusFilter = btn.dataset.status;
+        this.renderTable();
+      });
+    });
+
+    // Search Input
     const searchInput = document.getElementById('fleet-search-input');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
@@ -44,6 +59,7 @@ class TrackingPageController {
       });
     }
 
+    // Refresh Button
     const refreshBtn = document.getElementById('btn-refresh-fleet');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => {
@@ -51,6 +67,7 @@ class TrackingPageController {
       });
     }
 
+    // Store Synchronization
     store.subscribe((event, payload) => {
       if (event === 'satelliteChanged') {
         this.renderSatelliteDetails(payload);
@@ -100,6 +117,12 @@ class TrackingPageController {
       filtered = filtered.filter(s => s.orbitClass === this.activeOrbitFilter);
     }
 
+    if (this.activeStatusFilter === 'VALID') {
+      filtered = filtered.filter(s => s.orbitDataStatus === 'VALID');
+    } else if (this.activeStatusFilter === 'DEGRADED') {
+      filtered = filtered.filter(s => s.orbitDataStatus === 'DEGRADED' || s.orbitDataStatus === 'STALE');
+    }
+
     if (this.searchQuery) {
       filtered = filtered.filter(s => 
         s.name.toLowerCase().includes(this.searchQuery) || 
@@ -112,7 +135,7 @@ class TrackingPageController {
       tbody.innerHTML = `
         <tr>
           <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
-            No satellites match the current filters.
+            No satellites match the current filter criteria.
           </td>
         </tr>
       `;
@@ -124,22 +147,23 @@ class TrackingPageController {
     tbody.innerHTML = filtered.map(s => {
       const isSelected = s.id === selectedSatId;
       const statusClass = s.operationalStatus === 'CRITICAL_RISK' ? 'badge-critical' : (s.operationalStatus === 'DEGRADED' ? 'badge-warning' : 'badge-nominal');
+      const dataStatusClass = s.orbitDataStatus === 'VALID' ? 'badge-nominal' : 'badge-warning';
       const fuelPct = Math.round((s.remainingFuelKg / s.fuelCapacityKg) * 100);
 
       return `
         <tr class="${isSelected ? 'selected' : ''}" data-sat-id="${s.id}">
           <td><span class="badge ${statusClass}">${s.operationalStatus}</span></td>
+          <td><span class="badge ${dataStatusClass}">${s.orbitDataStatus || 'VALID'}</span></td>
           <td>
             <strong>${s.name}</strong>
-            <div style="font-size: 0.7rem; color: var(--color-cyan);">${s.id}</div>
+            <div style="font-size: 0.7rem; color: var(--color-cyan);">${s.id} (${s.callsign})</div>
           </td>
           <td class="mono">${s.noradId}</td>
-          <td><span class="badge badge-neutral">${s.orbitClass}</span></td>
+          <td><span class="badge badge-neutral">${s.objectType || 'PAYLOAD'}</span></td>
           <td class="mono">${s.orbit.altitudeKm.toFixed(1)} km</td>
           <td class="mono">
             ${s.remainingFuelKg.toFixed(1)} kg (${fuelPct}%)
           </td>
-          <td style="font-size: 0.72rem; color: var(--text-secondary);">${s.lastContact}</td>
           <td>
             <button class="btn btn-secondary btn-sm btn-select-sat" data-sat-id="${s.id}">
               ${isSelected ? 'SELECTED' : 'SELECT'}
@@ -150,7 +174,7 @@ class TrackingPageController {
     }).join('');
 
     tbody.querySelectorAll('tr[data-sat-id]').forEach(row => {
-      row.addEventListener('click', (e) => {
+      row.addEventListener('click', () => {
         const satId = row.dataset.satId;
         store.setSelectedSatellite(satId);
         this.highlightSelectedRow(satId);
@@ -187,19 +211,60 @@ class TrackingPageController {
     }
 
     if (badge) {
-      badge.textContent = sat.operationalStatus;
+      badge.textContent = `${sat.operationalStatus} | DATA: ${sat.orbitDataStatus || 'VALID'}`;
       badge.className = `badge ${sat.operationalStatus === 'CRITICAL_RISK' ? 'badge-critical' : (sat.operationalStatus === 'DEGRADED' ? 'badge-warning' : 'badge-nominal')}`;
     }
 
     const fuelPct = Math.round((sat.remainingFuelKg / sat.fuelCapacityKg) * 100);
+    const isDegraded = sat.orbitDataStatus === 'DEGRADED' || sat.orbitDataStatus === 'STALE';
+
+    // State Vector Extraction
+    const sv = sat.stateVector || {
+      positionVectorKm: { x: 0, y: 0, z: 0 },
+      velocityVectorKmS: { x: 0, y: 0, z: 0 },
+      referenceFrame: 'ECI_J2000'
+    };
 
     container.innerHTML = `
       <div class="telemetry-hud-card">
         <div>
           <h2 class="sat-title">${sat.name} (${sat.callsign})</h2>
-          <div class="sat-norad">ID: ${sat.id} | NORAD: ${sat.noradId} | COSPAR: ${sat.internationalDesignator}</div>
+          <div class="sat-norad">ID: ${sat.id} | NORAD: ${sat.noradId} | TYPE: ${sat.objectType || 'PAYLOAD'}</div>
+          <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">
+            DATA EPOCH: ${sat.dataEpoch || sat.orbit.epoch} | PROVENANCE: ${sat.provenance.source}
+          </div>
         </div>
 
+        ${isDegraded ? `
+          <div style="background: rgba(255, 179, 0, 0.12); border: 1px solid var(--color-advisory); border-radius: var(--border-radius-xs); padding: 8px 10px;">
+            <strong style="color: #ffd54f; font-size: 0.75rem; display: flex; align-items: center; gap: 6px;">
+              <span class="status-dot warning"></span>
+              DATA FRESHNESS ALERT: DEGRADED ORBITAL EPHEMERIS
+            </strong>
+            <p style="font-size: 0.7rem; color: #f8fafc; margin-top: 2px;">
+              Ground station telemetry link reported intermittent lock. Ephemeris uncertainty has expanded beyond 100m. Re-acquisition scheduled next pass.
+            </p>
+          </div>
+        ` : ''}
+
+        <!-- 3D State Vector in ECI J2000 -->
+        <div>
+          <span class="metric-label" style="display: block; margin-bottom: 6px;">
+            Inertial State Vector (${sv.referenceFrame || 'ECI_J2000'})
+          </span>
+          <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 8px 10px; font-family: var(--font-mono); font-size: 0.72rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: var(--text-muted);">Position (km):</span>
+              <span style="color: var(--color-cyan);">X: ${sv.positionVectorKm.x.toFixed(2)}, Y: ${sv.positionVectorKm.y.toFixed(2)}, Z: ${sv.positionVectorKm.z.toFixed(2)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Velocity (km/s):</span>
+              <span style="color: #ffd54f;">Vx: ${sv.velocityVectorKmS.x.toFixed(3)}, Vy: ${sv.velocityVectorKmS.y.toFixed(3)}, Vz: ${sv.velocityVectorKmS.z.toFixed(3)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Propulsion & Fuel Reserve -->
         <div>
           <span class="metric-label" style="display: block; margin-bottom: 6px;">Propulsion &amp; Mass Budget</span>
           <div class="propellant-gauge">
@@ -210,13 +275,10 @@ class TrackingPageController {
             <div class="propellant-bar-track">
               <div class="propellant-bar-fill ${fuelPct < 25 ? 'critical' : (fuelPct < 50 ? 'low' : '')}" style="width: ${fuelPct}%;"></div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;">
-              <span>Total Mass: ${sat.massKg} kg</span>
-              <span>Dry Mass: ${sat.dryMassKg} kg</span>
-            </div>
           </div>
         </div>
 
+        <!-- Subsystems Health Matrix -->
         <div>
           <span class="metric-label" style="display: block; margin-bottom: 6px;">Subsystem Health Matrix</span>
           <div class="subsystem-grid">
@@ -239,6 +301,7 @@ class TrackingPageController {
           </div>
         </div>
 
+        <!-- Keplerian Elements Table -->
         <div>
           <span class="metric-label" style="display: block; margin-bottom: 6px;">Keplerian Orbit Elements</span>
           <table class="orbital-elements-table">
@@ -250,7 +313,7 @@ class TrackingPageController {
               <tr><td>Arg of Perigee (ω)</td><td>${sat.orbit.argOfPerigeeDeg.toFixed(1)}°</td></tr>
               <tr><td>True Anomaly (ν)</td><td>${sat.orbit.trueAnomalyDeg.toFixed(1)}°</td></tr>
               <tr><td>Orbital Period</td><td>${sat.orbit.orbitalPeriodMinutes.toFixed(1)} min</td></tr>
-              <tr><td>Telemetry Provenance</td><td style="color: var(--color-cyan);">${sat.provenance.source}</td></tr>
+              <tr><td>Last Ground Pass</td><td style="color: #ffd54f;">${sat.lastContact}</td></tr>
             </tbody>
           </table>
         </div>
