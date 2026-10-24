@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Operational Event History & Audit Log</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="app-shell">
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          Operational Event History &amp; Mission Audit Log
+        </h1>
+        <p>Complete immutable chronological ledger of conjunction alerts, station contacts, and maneuver executions.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-export-csv">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          EXPORT AUDIT LOG (.CSV)
+        </button>
+      </div>
+    </section>
+
+    <!-- Filter & Search Toolbar -->
+    <section class="filter-bar">
+      <div class="filter-group">
+        <span class="metric-label">SEVERITY:</span>
+        <button class="filter-btn severity-btn active" data-sev="ALL">ALL</button>
+        <button class="filter-btn severity-btn" data-sev="CRITICAL">CRITICAL</button>
+        <button class="filter-btn severity-btn" data-sev="WARNING">WARNING</button>
+        <button class="filter-btn severity-btn" data-sev="INFO">INFO</button>
+      </div>
+
+      <div class="filter-group">
+        <span class="metric-label">CATEGORY:</span>
+        <button class="filter-btn category-btn active" data-cat="ALL">ALL</button>
+        <button class="filter-btn category-btn" data-cat="CONJUNCTION">CONJUNCTION</button>
+        <button class="filter-btn category-btn" data-cat="TELEMETRY">TELEMETRY</button>
+        <button class="filter-btn category-btn" data-cat="PROPULSION">PROPULSION</button>
+      </div>
+
+      <div class="filter-group">
+        <input type="text" class="search-input" id="history-search-input" placeholder="Search event logs...">
+        <button class="btn btn-secondary btn-sm" id="btn-clear-history-search">CLEAR</button>
+      </div>
+    </section>
+
+    <!-- Event History Table Panel -->
+    <div class="ops-panel">
+      <div class="panel-header">
+        <span class="panel-title">Mission Operations Event Ledger</span>
+        <span class="badge badge-neutral" id="history-count-badge">5 Events</span>
+      </div>
+      <div class="panel-body" style="padding: 0; overflow-x: auto;">
+        <table class="ops-table" aria-label="Operational Events">
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>UTC Timestamp</th>
+              <th>Category</th>
+              <th>Event Title</th>
+              <th>Description</th>
+              <th>Related Object</th>
+              <th>Provenance</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 30px;">
+                <div class="state-container loading">
+                  <div class="spinner"></div>
+                  <div class="state-title">Loading Operations Ledger...</div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/history.js"></script>
+</body>
+</html>

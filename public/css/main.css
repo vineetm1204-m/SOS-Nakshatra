@@ -1,0 +1,480 @@
+/* SOS (Safe Orbit for Satellites) — Aerospace Operations Design System */
+:root {
+  /* Surface colors */
+  --bg-space: #07090e;
+  --bg-surface: #0d1118;
+  --bg-surface-raised: #131923;
+  --bg-surface-hover: #18202d;
+  --bg-surface-active: #1e2838;
+  --border-subtle: #1f2937;
+  --border-medium: #2e3b4e;
+  --border-bright: #43546f;
+
+  /* Tactical status colors */
+  --color-nominal: #00e676;
+  --color-nominal-dim: rgba(0, 230, 118, 0.15);
+  --color-cyan: #00e5ff;
+  --color-cyan-dim: rgba(0, 229, 255, 0.15);
+  --color-advisory: #ffb300;
+  --color-advisory-dim: rgba(255, 179, 0, 0.15);
+  --color-critical: #ff334b;
+  --color-critical-dim: rgba(255, 51, 75, 0.18);
+  --color-debris: #f97316;
+
+  /* Typography */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-inverse: #07090e;
+
+  /* Font stacks */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  /* Elevation & Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-glow-cyan: 0 0 16px rgba(0, 229, 255, 0.25);
+  --shadow-glow-red: 0 0 16px rgba(255, 51, 75, 0.35);
+
+  /* Layout */
+  --header-height: 56px;
+  --status-bar-height: 28px;
+  --border-radius-xs: 2px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--bg-space);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: var(--border-radius-xs);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-bright);
+}
+
+/* Aerospace Grid & Layout Container */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  padding: 16px 20px;
+  max-width: 1680px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Page Header */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.page-title-group h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title-group p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Metric Cards Grid */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color 0.15s ease;
+}
+
+.metric-card:hover {
+  border-color: var(--border-medium);
+}
+
+.metric-card.critical {
+  border-left: 3px solid var(--color-critical);
+  background: linear-gradient(90deg, var(--color-critical-dim) 0%, var(--bg-surface) 100%);
+}
+
+.metric-card.warning {
+  border-left: 3px solid var(--color-advisory);
+}
+
+.metric-card.nominal {
+  border-left: 3px solid var(--color-nominal);
+}
+
+.metric-card.cyan {
+  border-left: 3px solid var(--color-cyan);
+}
+
+.metric-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.metric-value {
+  font-family: var(--font-mono);
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0 2px 0;
+}
+
+.metric-subtext {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+/* Operational Panels Layout */
+.ops-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .ops-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ops-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 10px 14px;
+  background: var(--bg-surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-body {
+  padding: 14px;
+  flex: 1;
+}
+
+/* Featured Action Banner */
+.featured-alert-banner {
+  background: linear-gradient(90deg, rgba(255, 51, 75, 0.16) 0%, rgba(20, 15, 20, 0.95) 100%);
+  border: 1px solid var(--color-critical);
+  border-radius: var(--border-radius-sm);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  box-shadow: var(--shadow-glow-red);
+}
+
+.featured-alert-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.featured-icon-badge {
+  background: var(--color-critical);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 6px 10px;
+  border-radius: var(--border-radius-xs);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.featured-alert-text h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.featured-alert-text p {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  margin-top: 3px;
+}
+
+/* Aerospace Tables */
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.ops-table th {
+  background: var(--bg-surface-raised);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 600;
+}
+
+.ops-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.ops-table tr:hover td {
+  background: var(--bg-surface-hover);
+  cursor: pointer;
+}
+
+.ops-table tr.selected td {
+  background: var(--bg-surface-active);
+  border-left: 2px solid var(--color-cyan);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* Badges & Indicators */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--border-radius-xs);
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-critical {
+  background: var(--color-critical-dim);
+  color: #ff526b;
+  border: 1px solid rgba(255, 51, 75, 0.4);
+}
+
+.badge-warning {
+  background: var(--color-advisory-dim);
+  color: #ffc107;
+  border: 1px solid rgba(255, 179, 0, 0.4);
+}
+
+.badge-nominal {
+  background: var(--color-nominal-dim);
+  color: #00e676;
+  border: 1px solid rgba(0, 230, 118, 0.4);
+}
+
+.badge-cyan {
+  background: var(--color-cyan-dim);
+  color: var(--color-cyan);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+}
+
+.badge-neutral {
+  background: var(--bg-surface-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Status Indicator Dot */
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.nominal {
+  background: var(--color-nominal);
+  box-shadow: 0 0 6px var(--color-nominal);
+}
+
+.status-dot.critical {
+  background: var(--color-critical);
+  box-shadow: 0 0 6px var(--color-critical);
+}
+
+.status-dot.warning {
+  background: var(--color-advisory);
+  box-shadow: 0 0 6px var(--color-advisory);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--color-cyan);
+  color: var(--text-inverse);
+  border-color: var(--color-cyan);
+}
+.btn-primary:hover {
+  background: #33ebff;
+  box-shadow: var(--shadow-glow-cyan);
+}
+
+.btn-critical {
+  background: var(--color-critical);
+  color: #fff;
+  border-color: var(--color-critical);
+}
+.btn-critical:hover {
+  background: #ff4d63;
+  box-shadow: var(--shadow-glow-red);
+}
+
+.btn-secondary {
+  background: var(--bg-surface-raised);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+.btn-secondary:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-bright);
+}
+
+.btn-sm {
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
+
+/* Empty, Loading, and Error States */
+.state-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.state-container.loading .spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border-medium);
+  border-top-color: var(--color-cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.state-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.state-desc {
+  font-size: 0.8rem;
+  max-width: 360px;
+  margin-bottom: 12px;
+}

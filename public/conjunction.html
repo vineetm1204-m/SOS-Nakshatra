@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Conjunction Analysis & Risk Assessment</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="app-shell">
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <span class="status-dot critical"></span>
+          Conjunction Analysis &amp; TCA Geometry
+        </h1>
+        <p>Close approach screening, miss-distance vectors, and collision probability modeling.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-refresh-conjunctions">
+          RE-RUN SCREENING
+        </button>
+      </div>
+    </section>
+
+    <!-- Conjunction Selector Ribbon -->
+    <div class="filter-bar" style="background: var(--bg-surface); padding: 10px 14px; border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm);">
+      <div class="filter-group">
+        <span class="metric-label">ACTIVE EVENTS:</span>
+        <div id="conj-event-buttons" style="display: flex; gap: 8px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+      <div>
+        <span class="badge badge-critical" id="active-conj-risk-badge">CRITICAL RISK</span>
+      </div>
+    </div>
+
+    <!-- Main Conjunction Analysis Grid -->
+    <div class="ops-grid" style="margin-top: 16px;">
+      <!-- Left Column: Encounter Geometry & Geometry Vector Breakdown -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Encounter Geometry Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card critical">
+            <span class="metric-label">Total Miss Distance</span>
+            <span class="metric-value" id="conj-metric-miss">-- m</span>
+            <span class="metric-subtext" style="color: #ff526b;">Threshold: 500 m</span>
+          </div>
+
+          <div class="metric-card critical">
+            <span class="metric-label">Collision Probability (Pc)</span>
+            <span class="metric-value" id="conj-metric-pc">--</span>
+            <span class="metric-subtext" style="color: #ff526b;">Redline: 1.0e-04</span>
+          </div>
+
+          <div class="metric-card cyan">
+            <span class="metric-label">Relative Velocity</span>
+            <span class="metric-value" id="conj-metric-vrel">-- km/s</span>
+            <span class="metric-subtext">Hypervelocity encounter</span>
+          </div>
+
+          <div class="metric-card warning">
+            <span class="metric-label">Time to Closest Approach</span>
+            <span class="metric-value" id="conj-metric-tca">--:--:--</span>
+            <span class="metric-subtext" id="conj-metric-tca-iso">TCA Epoch</span>
+          </div>
+        </div>
+
+        <!-- 3-Component Miss Distance Vector & Covariance Panel -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="2" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+              </svg>
+              Encounter Frame Miss Distance Vector (RIC Coordinates)
+            </span>
+            <span class="badge badge-neutral">RADIAL / IN-TRACK / CROSS-TRACK</span>
+          </div>
+
+          <div class="panel-body">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px;">
+              <div class="metric-card">
+                <span class="metric-label">Radial Separation (ΔR)</span>
+                <span class="metric-value" id="vector-radial" style="font-size: 1.3rem;">-- m</span>
+                <span class="metric-subtext">Height difference</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">In-Track Separation (ΔT)</span>
+                <span class="metric-value" id="vector-in-track" style="font-size: 1.3rem;">-- m</span>
+                <span class="metric-subtext">Along velocity vector</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Cross-Track Separation (ΔN)</span>
+                <span class="metric-value" id="vector-cross-track" style="font-size: 1.3rem;">-- m</span>
+                <span class="metric-subtext">Orbital plane offset</span>
+              </div>
+            </div>
+
+            <!-- Provenance & Covariance Note -->
+            <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 12px;">
+              <div style="font-weight: 600; color: #fff; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                <span class="status-dot warning"></span>
+                <span>Uncertainty Covariance &amp; Mathematical Assumptions</span>
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45;" id="conj-covariance-notes">
+                Collision probability computed using Akella-Alfriend 2D encounter plane projection under Gaussian state uncertainty assumptions. Combined hard-body radius: 5.0m.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Object Profiles & Action Gates -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Objects Involved in Conjunction -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Encounter Pair Profile</span>
+            <span class="badge badge-cyan" id="conj-event-code">CONJ-2026-084</span>
+          </div>
+
+          <div class="panel-body">
+            <!-- Primary Spacecraft -->
+            <div style="margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle);">
+              <span class="metric-label" style="color: var(--color-cyan);">PRIMARY PROTECTED ASSET</span>
+              <h3 style="font-size: 1.1rem; color: #fff; margin-top: 2px;" id="pair-primary-name">SENTINEL-X</h3>
+              <div style="font-size: 0.72rem; color: var(--text-secondary);" id="pair-primary-id">ID: SAT-LEO-02 | NORAD: 49211</div>
+            </div>
+
+            <!-- Secondary Intersecting Object -->
+            <div style="margin-bottom: 16px;">
+              <span class="metric-label" style="color: var(--color-critical);">INTERSECTING SECONDARY OBJECT</span>
+              <h3 style="font-size: 1.05rem; color: #ffd54f; margin-top: 2px;" id="pair-secondary-name">COSMOS-2251 DEBRIS</h3>
+              <div style="font-size: 0.72rem; color: var(--text-secondary);" id="pair-secondary-id">DEBRIS FRAGMENT #23419 | RCS: 0.12 m²</div>
+            </div>
+
+            <!-- Recommended Operational Action -->
+            <div style="background: rgba(255, 51, 75, 0.1); border: 1px solid var(--color-critical); border-radius: var(--border-radius-xs); padding: 12px; margin-bottom: 16px;">
+              <strong style="color: #ff526b; font-size: 0.8rem; display: block; margin-bottom: 4px;">OPERATOR ACTION MANDATED</strong>
+              <p style="font-size: 0.75rem; color: #f8fafc;">
+                Predicted miss distance (184m) violates safety threshold (500m). Collision avoidance burn must be calculated and uploaded prior to burn decision deadline (T-02h 00m).
+              </p>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <a href="maneuvers.html" class="btn btn-critical" id="btn-proceed-to-planner">
+                PROCEED TO MANEUVER PLANNER →
+              </a>
+              <a href="autopilot.html" class="btn btn-secondary" id="btn-consult-flight-director">
+                CONSULT FLIGHT DIRECTOR AI / EXPERT →
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Provenance Card -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Data Provenance &amp; Tracking Feed</span>
+          </div>
+          <div class="panel-body" style="font-size: 0.75rem; color: var(--text-secondary);">
+            <div style="margin-bottom: 6px;">
+              <strong style="color: var(--text-primary);">Data Source:</strong> <span id="provenance-source" class="mono">SYNTHETIC_DEMO</span>
+            </div>
+            <div style="margin-bottom: 6px;">
+              <strong style="color: var(--text-primary);">Provider:</strong> <span id="provenance-provider">SSN-Sim Conjunction Network</span>
+            </div>
+            <div>
+              <strong style="color: var(--text-primary);">Confidence:</strong> <span id="provenance-confidence" class="mono">96.0%</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/conjunction.js"></script>
+</body>
+</html>

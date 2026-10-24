@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Fleet Tracking & Satellite Telemetry</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="app-shell">
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="12 8 8 12 12 16 16 12 12 8"/>
+          </svg>
+          Fleet Tracking & Spacecraft Telemetry
+        </h1>
+        <p>Real-time orbital tracking, subsystem health diagnostics, and propellant telemetry.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-refresh-fleet">
+          REFRESH FLEET DATA
+        </button>
+      </div>
+    </section>
+
+    <!-- Filters and Search Toolbar -->
+    <section class="filter-bar">
+      <div class="filter-group">
+        <span class="metric-label" style="margin-right: 4px;">ORBIT CLASS:</span>
+        <button class="filter-btn fleet-orbit-btn active" data-orbit="ALL">ALL (5)</button>
+        <button class="filter-btn fleet-orbit-btn" data-orbit="LEO">LEO (2)</button>
+        <button class="filter-btn fleet-orbit-btn" data-orbit="SSO">SSO (1)</button>
+        <button class="filter-btn fleet-orbit-btn" data-orbit="MEO">MEO (1)</button>
+        <button class="filter-btn fleet-orbit-btn" data-orbit="GEO">GEO (1)</button>
+      </div>
+
+      <div class="filter-group">
+        <input type="text" class="search-input" id="fleet-search-input" placeholder="Search by name, NORAD..." aria-label="Search satellites">
+        <button class="btn btn-secondary btn-sm" id="btn-clear-search">CLEAR</button>
+      </div>
+    </section>
+
+    <!-- Fleet Registry Table -->
+    <div class="ops-grid">
+      <div class="ops-panel">
+        <div class="panel-header">
+          <span class="panel-title">Active Constellation Assets</span>
+          <span class="badge badge-neutral" id="fleet-count-badge">5 Tracked</span>
+        </div>
+        <div class="panel-body" style="padding: 0; overflow-x: auto;">
+          <table class="ops-table" aria-label="Fleet Tracking Registry">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Asset / Callsign</th>
+                <th>NORAD ID</th>
+                <th>Orbit Class</th>
+                <th>Altitude</th>
+                <th>Fuel Reserve</th>
+                <th>Last Pass</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="fleet-table-body">
+              <tr>
+                <td colspan="8" style="text-align: center; padding: 30px;">
+                  <div class="state-container loading">
+                    <div class="spinner"></div>
+                    <div class="state-title">Loading Fleet Telemetry...</div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Focused Spacecraft Telemetry Panel -->
+      <div class="ops-panel">
+        <div class="panel-header">
+          <span class="panel-title">Asset Telemetry Diagnostics</span>
+          <span class="badge" id="focus-sat-status-badge">--</span>
+        </div>
+        <div class="panel-body" id="focus-sat-details">
+          <div class="state-container">
+            <div class="state-title">Select a Satellite</div>
+            <div class="state-desc">Click any spacecraft in the registry to inspect full orbital telemetry.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/tracking.js"></script>
+</body>
+</html>

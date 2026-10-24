@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Mission Control & Conjunction Operations</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="app-shell">
+  <!-- Shared Aerospace Navigation Header Web Component -->
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <!-- Page Header & Action Controls -->
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <span class="status-dot critical"></span>
+          Mission Control & Space Situational Awareness
+        </h1>
+        <p>Operational fleet surveillance, real-time encounter screening, and automated conjunction triage.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-refresh-telemetry" title="Fetch latest telemetry and screening data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          REFRESH TELEMETRY
+        </button>
+      </div>
+    </section>
+
+    <!-- Featured Critical Conjunction Alert Banner -->
+    <section class="featured-alert-banner" id="featured-conjunction-banner" style="display: none;">
+      <div class="featured-alert-info">
+        <div class="featured-icon-badge">PRIORITY 1</div>
+        <div class="featured-alert-text">
+          <!-- Populated by index.js -->
+        </div>
+      </div>
+      <div class="featured-actions">
+        <button class="btn btn-critical" id="btn-open-featured-workflow">
+          OPEN CONJUNCTION WORKFLOW →
+        </button>
+      </div>
+    </section>
+
+    <!-- Fleet Summary Metrics Cards -->
+    <section class="metrics-grid" aria-label="Fleet Summary Metrics">
+      <div class="metric-card cyan">
+        <span class="metric-label">Tracked Spacecraft</span>
+        <span class="metric-value" id="metric-total-tracked">--</span>
+        <span class="metric-subtext">LEO / SSO / MEO / GEO</span>
+      </div>
+
+      <div class="metric-card nominal">
+        <span class="metric-label">Operational Nominal</span>
+        <span class="metric-value" id="metric-operational">--</span>
+        <span class="metric-subtext">All telemetry locks active</span>
+      </div>
+
+      <div class="metric-card warning">
+        <span class="metric-label">Conjunction Alerts</span>
+        <span class="metric-value" id="metric-conjunctions">--</span>
+        <span class="metric-subtext">In current screening window</span>
+      </div>
+
+      <div class="metric-card critical">
+        <span class="metric-label">Critical Conjunctions</span>
+        <span class="metric-value" id="metric-critical-alerts">--</span>
+        <span class="metric-subtext">Miss distance &lt; 500m</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-label">Pending Maneuvers</span>
+        <span class="metric-value" id="metric-pending-maneuvers">--</span>
+        <span class="metric-subtext">Awaiting operator sign-off</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="metric-label">Fleet Propellant Nominal</span>
+        <span class="metric-value" id="metric-fuel-nominal">--</span>
+        <span class="metric-subtext">&gt; 20% mass budget reserve</span>
+      </div>
+    </section>
+
+    <!-- Operational Split Grid: Primary Visualizer & Active Alert Triage -->
+    <section class="ops-grid">
+      <!-- Left Column: Primary Orbital Visualization & Conjunction Alerts List -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Primary Orbital Visualization Panel -->
+        <div class="orbital-viz-panel">
+          <div class="orbital-viz-header">
+            <div class="orbital-legend">
+              <span class="legend-item">
+                <span class="legend-marker satellite"></span> PRIMARY ASSET
+              </span>
+              <span class="legend-item">
+                <span class="legend-marker debris"></span> TRACKED DEBRIS
+              </span>
+              <span class="legend-item">
+                <span class="legend-marker orbit"></span> CONJUNCTION NODE
+              </span>
+            </div>
+
+            <div class="orbital-controls">
+              <button class="btn btn-secondary btn-sm active" id="btn-viz-plane">ORBITAL PLANE</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-encounter">HILL ENCOUNTER (CW)</button>
+              <button class="btn btn-secondary btn-sm" id="btn-viz-fallback">SIMULATE FALLBACK</button>
+            </div>
+          </div>
+
+          <!-- Canvas Rendering Surface -->
+          <canvas id="orbit-canvas" class="viz-canvas"></canvas>
+
+          <!-- Fallback Container (for loading / errors / manual toggle) -->
+          <div id="orbit-canvas-fallback" class="viz-fallback" style="display: none;"></div>
+        </div>
+
+        <!-- Active Conjunction Alerts Table Panel -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">
+              <span class="status-dot critical"></span>
+              Active Conjunction Alerts & Screening
+            </span>
+            <div class="filter-group">
+              <button class="filter-btn alert-filter-btn active" data-filter="ALL">ALL (3)</button>
+              <button class="filter-btn alert-filter-btn" data-filter="CRITICAL">CRITICAL ONLY</button>
+              <button class="filter-btn alert-filter-btn" data-filter="ACTIVE">ACTIVE UNCLEARED</button>
+            </div>
+          </div>
+
+          <div class="panel-body" style="padding: 0; overflow-x: auto;">
+            <table class="ops-table" aria-label="Conjunction Alerts">
+              <thead>
+                <tr>
+                  <th>Risk Level</th>
+                  <th>Event Code</th>
+                  <th>Primary Asset</th>
+                  <th>Secondary Object</th>
+                  <th>Miss Distance</th>
+                  <th>Time to TCA</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="conjunction-alerts-table-body">
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 24px;">
+                    <div class="state-container loading">
+                      <div class="spinner"></div>
+                      <div class="state-title">Loading Conjunction Alerts...</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Selected Satellite HUD & Recent Events Log -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Selected Satellite Telemetry Panel -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/>
+                <circle cx="12" cy="12" r="3" fill="var(--color-cyan)"/>
+              </svg>
+              Selected Spacecraft Telemetry
+            </span>
+            <span class="badge badge-critical" id="sat-card-status-badge">CRITICAL_RISK</span>
+          </div>
+
+          <div class="panel-body">
+            <div class="telemetry-hud-card">
+              <div class="telemetry-header-row">
+                <div>
+                  <h2 class="sat-title" id="sat-card-name">SENTINEL-X</h2>
+                  <div class="sat-norad" id="sat-card-norad">NORAD: 49211 | INT: 2021-088B | CLASS: LEO</div>
+                </div>
+              </div>
+
+              <!-- Subsystem Status Matrix -->
+              <div>
+                <span class="metric-label" style="display: block; margin-bottom: 6px;">Subsystems Status Matrix</span>
+                <div class="subsystem-grid">
+                  <div class="subsystem-item">
+                    <span class="subsystem-name">EPS / Power</span>
+                    <span id="subsystem-power"><span class="badge badge-nominal">NOMINAL</span></span>
+                  </div>
+                  <div class="subsystem-item">
+                    <span class="subsystem-name">Propulsion</span>
+                    <span id="subsystem-propulsion"><span class="badge badge-nominal">NOMINAL</span></span>
+                  </div>
+                  <div class="subsystem-item">
+                    <span class="subsystem-name">ADCS / Attitude</span>
+                    <span id="subsystem-adcs"><span class="badge badge-nominal">LOCKED</span></span>
+                  </div>
+                  <div class="subsystem-item">
+                    <span class="subsystem-name">TT&amp;C Comms</span>
+                    <span id="subsystem-comms"><span class="badge badge-nominal">ONLINE</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Propellant Gauge -->
+              <div class="propellant-gauge">
+                <div class="propellant-label-row">
+                  <span>HYDRAZINE PROPELLANT RESERVE</span>
+                  <span class="mono" id="sat-card-fuel-text">128.5 / 200.0 kg (64%)</span>
+                </div>
+                <div class="propellant-bar-track">
+                  <div class="propellant-bar-fill" id="sat-card-fuel-bar" style="width: 64%;"></div>
+                </div>
+              </div>
+
+              <!-- Orbital Parameters Readout -->
+              <div>
+                <span class="metric-label" style="display: block; margin-bottom: 6px;">Keplerian Orbit Parameters</span>
+                <table class="orbital-elements-table">
+                  <tbody>
+                    <tr>
+                      <td>Mean Altitude</td>
+                      <td id="sat-card-altitude">680.1 km</td>
+                    </tr>
+                    <tr>
+                      <td>Inclination</td>
+                      <td id="sat-card-inclination">97.40°</td>
+                    </tr>
+                    <tr>
+                      <td>Orbital Period</td>
+                      <td id="sat-card-period">98.3 min</td>
+                    </tr>
+                    <tr>
+                      <td>Orbital Velocity</td>
+                      <td id="sat-card-velocity">7.52 km/s</td>
+                    </tr>
+                    <tr>
+                      <td>Last Station Pass</td>
+                      <td id="sat-card-contact" style="font-size: 0.7rem; color: #ffd54f;">Svalbard KSAT</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Operational Events Audit Log -->
+        <div class="ops-panel" style="flex: 1;">
+          <div class="panel-header">
+            <span class="panel-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              Recent Operational Events
+            </span>
+            <a href="history.html" class="btn btn-secondary btn-sm">FULL LOG →</a>
+          </div>
+
+          <div class="panel-body" id="events-log-container">
+            <div class="state-container loading">
+              <div class="spinner"></div>
+              <div class="state-title">Loading Events...</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Frontend Modules -->
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/index.js"></script>
+</body>
+</html>

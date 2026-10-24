@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Flight Director & Autonomous Operational Workflow</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Workflow Stepper Styles */
+    .workflow-strip {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--border-radius-sm);
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .workflow-step {
+      flex: 1;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-right: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      position: relative;
+      transition: all 0.2s ease;
+    }
+    .workflow-step:last-child {
+      border-right: none;
+    }
+    .workflow-step.completed {
+      background: rgba(0, 230, 118, 0.08);
+      color: var(--color-nominal);
+    }
+    .workflow-step.active {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--color-cyan);
+      font-weight: 700;
+      border-bottom: 2px solid var(--color-cyan);
+    }
+    .step-number {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-medium);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+    .workflow-step.completed .step-number {
+      background: var(--color-nominal);
+      color: #000;
+      border-color: var(--color-nominal);
+    }
+    .workflow-step.active .step-number {
+      background: var(--color-cyan);
+      color: #000;
+      border-color: var(--color-cyan);
+    }
+  </style>
+</head>
+<body class="app-shell">
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          Flight Director &amp; Autonomous Conjunction Workflow
+        </h1>
+        <p>Operational execution pipeline: TRACK → DETECT → ASSESS → PLAN → BURN → CLEAR with mandatory operator gate.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-reset-workflow">
+          RESET SIMULATION WORKFLOW
+        </button>
+      </div>
+    </section>
+
+    <!-- Visual 6-Stage Operational Workflow Strip -->
+    <section class="workflow-strip" aria-label="Operational Workflow Stages">
+      <div class="workflow-step completed" id="step-track">
+        <span class="step-number">✓</span>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase;">1. TRACK</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">Fleet Surveillance</div>
+        </div>
+      </div>
+
+      <div class="workflow-step completed" id="step-detect">
+        <span class="step-number">✓</span>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase;">2. DETECT</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">Encounter Flagged</div>
+        </div>
+      </div>
+
+      <div class="workflow-step completed" id="step-assess">
+        <span class="step-number">✓</span>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase;">3. ASSESS</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">Miss: 184m (Critical)</div>
+        </div>
+      </div>
+
+      <div class="workflow-step completed" id="step-plan">
+        <span class="step-number">✓</span>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase;">4. PLAN</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">ΔV Target: 0.85 m/s</div>
+        </div>
+      </div>
+
+      <div class="workflow-step active" id="step-burn">
+        <span class="step-number">5</span>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase;">5. BURN GATE</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">Operator Sign-Off</div>
+        </div>
+      </div>
+
+      <div class="workflow-step" id="step-clear">
+        <span class="step-number">6</span>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase;">6. CLEAR</div>
+          <div style="font-size: 0.68rem; color: var(--text-secondary);">Encounter Cleared</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operational Split -->
+    <div class="ops-grid">
+      <!-- Left: Flight Director Advisory Assessment -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Flight Director Tactical Assessment</span>
+            <span class="badge badge-critical" id="fd-threat-badge">INTERVENTION REQUIRED</span>
+          </div>
+
+          <div class="panel-body">
+            <div style="background: var(--bg-surface-raised); border-left: 3px solid var(--color-cyan); padding: 12px 14px; margin-bottom: 16px; border-radius: var(--border-radius-xs);">
+              <div style="font-weight: 700; color: #fff; font-size: 0.88rem; margin-bottom: 4px;">
+                EXPERT SYSTEM EVALUATION &amp; DECISION DIRECTIVE
+              </div>
+              <p style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;" id="fd-assessment-text">
+                Primary asset <strong>SENTINEL-X</strong> is on a confirmed collision course with Cosmos-2251 debris fragment #23419. 
+                Time to TCA is <strong>04h 18m</strong>. The proposed maneuver (ΔV = +0.85 m/s in-track) increases miss distance to 2,450 meters 
+                and reduces collision probability from 4.82e-03 to &lt; 1.0e-07. Propellant expenditure (0.49 kg) is within safe operational reserves.
+              </p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;">
+              <div class="metric-card">
+                <span class="metric-label">Rule-Based Determinism</span>
+                <span class="metric-value mono" style="font-size: 1.25rem; color: var(--color-nominal);">100%</span>
+                <span class="metric-subtext">Zero hallucination</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Clearance Verification</span>
+                <span class="metric-value mono" style="font-size: 1.25rem; color: var(--color-nominal);">PASSED</span>
+                <span class="metric-subtext">No secondary conjs</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Execution Readiness</span>
+                <span class="metric-value mono" style="font-size: 1.25rem; color: #ffd54f;">AWAITING OP</span>
+                <span class="metric-subtext">Gate 5 pending</span>
+              </div>
+            </div>
+
+            <!-- Operator Approval Action Gate Card -->
+            <div id="operator-approval-card" style="background: rgba(255, 51, 75, 0.08); border: 1px solid var(--color-critical); border-radius: var(--border-radius-sm); padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="color: #fff; font-size: 0.95rem;">MANDATORY OPERATOR SIGN-OFF GATE</strong>
+                <span class="badge badge-critical">GATE 5 ACTIVE</span>
+              </div>
+              <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 14px;">
+                In accordance with orbital safety doctrine, simulated burn commands cannot execute without explicit operator authorization. Confirm parameter review.
+              </p>
+              <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="btn btn-critical" id="btn-approve-burn">
+                  OPERATOR AUTHORIZATION: EXECUTE SIMULATED BURN →
+                </button>
+                <button class="btn btn-secondary" id="btn-abort-burn">ABORT PLAN</button>
+              </div>
+            </div>
+
+            <!-- Post-Burn Clearance Banner (Hidden initially) -->
+            <div id="post-burn-clearance-card" style="display: none; background: rgba(0, 230, 118, 0.1); border: 1px solid var(--color-nominal); border-radius: var(--border-radius-sm); padding: 16px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="color: #fff; font-size: 0.95rem; display: flex; align-items: center; gap: 8px;">
+                  <span class="status-dot nominal"></span>
+                  ENCOUNTER OFFICIALLY CLEARED (STAGE 6 COMPLETE)
+                </strong>
+                <span class="badge badge-nominal">SAFE CLEARANCE</span>
+              </div>
+              <p style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 12px;" id="clearance-summary-text">
+                Simulated RCS pulse confirmed. New trajectory telemetry verified: Miss distance = 2,450 meters. Collision probability reduced to &lt; 1.0e-07. Event promoted to CLEARED status.
+              </p>
+              <div style="font-size: 0.7rem; color: #94a3b8; border-top: 1px solid rgba(0, 230, 118, 0.2); padding-top: 8px;">
+                SIMULATION NOTICE: This is a verified simulated operational workflow for test and validation.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Real-time Execution Telemetry Console -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Execution Telemetry Stream</span>
+            <span class="badge badge-cyan" id="sim-status-badge">STANDBY</span>
+          </div>
+          <div class="panel-body" style="background: #05080e; font-family: var(--font-mono); font-size: 0.72rem; padding: 12px; height: 320px; overflow-y: auto;" id="exec-log-console">
+            <div style="color: #64748b;">[08:52:10 UTC] Flight Director initialized. Tracking 5 fleet assets.</div>
+            <div style="color: #ffd54f;">[08:52:14 UTC] Conjunction S-2026-084 flagged. Screening window active.</div>
+            <div style="color: #00e5ff;">[08:52:20 UTC] Avoidance plan loaded: ΔV = 0.85 m/s In-Track.</div>
+            <div style="color: #fff; font-weight: 700;">[AWAITING] Operator sign-off required on Gate 5.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/autopilot.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Collision Avoidance Maneuver Planner</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="app-shell">
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          Collision Avoidance Maneuver Planner (CAM)
+        </h1>
+        <p>Optimal Delta-V trajectory optimization, propellant budget solver, and burn timing windows.</p>
+      </div>
+      <div class="page-actions">
+        <a href="conjunction.html" class="btn btn-secondary">← BACK TO CONJUNCTION</a>
+      </div>
+    </section>
+
+    <!-- Context Banner -->
+    <div class="filter-bar" style="background: var(--bg-surface); padding: 10px 14px; border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm);">
+      <div class="filter-group">
+        <span class="metric-label">PLANNING CONJUNCTION:</span>
+        <strong id="plan-conj-code" style="color: #ffd54f;">CONJ-2026-084</strong>
+        <span style="color: var(--text-muted); margin: 0 8px;">|</span>
+        <span class="metric-label">TARGET SPACECRAFT:</span>
+        <strong id="plan-sat-name" style="color: var(--color-cyan);">SENTINEL-X</strong>
+      </div>
+      <div>
+        <span class="badge badge-warning" id="plan-status-badge">CAM DRAFTING</span>
+      </div>
+    </div>
+
+    <!-- Planner Grid -->
+    <div class="ops-grid" style="margin-top: 16px;">
+      <!-- Left: Maneuver Controls and Burn Profile -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Maneuver Parameter Solver</span>
+            <span class="badge badge-neutral">TSIOLKOVSKY SOLVER</span>
+          </div>
+          <div class="panel-body">
+            <!-- Burn Direction Selection -->
+            <div style="margin-bottom: 18px;">
+              <span class="metric-label" style="display: block; margin-bottom: 8px;">Burn Vector Orientation</span>
+              <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                <button class="filter-btn burn-dir-btn active" data-dir="ALONG_TRACK_POS">
+                  +IN-TRACK<br><small style="font-size: 0.65rem; color: var(--text-muted);">Prograde (Raise)</small>
+                </button>
+                <button class="filter-btn burn-dir-btn" data-dir="ALONG_TRACK_NEG">
+                  -IN-TRACK<br><small style="font-size: 0.65rem; color: var(--text-muted);">Retrograde (Lower)</small>
+                </button>
+                <button class="filter-btn burn-dir-btn" data-dir="CROSS_TRACK">
+                  CROSS-TRACK<br><small style="font-size: 0.65rem; color: var(--text-muted);">Out-of-Plane</small>
+                </button>
+                <button class="filter-btn burn-dir-btn" data-dir="RADIAL">
+                  RADIAL<br><small style="font-size: 0.65rem; color: var(--text-muted);">Eccentricity</small>
+                </button>
+              </div>
+            </div>
+
+            <!-- Delta-V Target Slider & Input -->
+            <div style="margin-bottom: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span class="metric-label">Impulse Magnitude (Delta-V Target)</span>
+                <span class="mono" id="slider-val-display" style="font-size: 1.1rem; color: var(--color-cyan); font-weight: 700;">0.85 m/s</span>
+              </div>
+              <input type="range" id="delta-v-slider" min="0.10" max="3.00" step="0.05" value="0.85" style="width: 100%; accent-color: var(--color-cyan); cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
+                <span>0.10 m/s (Minimum RCS pulse)</span>
+                <span>1.50 m/s (Recommended)</span>
+                <span>3.00 m/s (High delta)</span>
+              </div>
+            </div>
+
+            <!-- Projected Outcomes Comparison Table -->
+            <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 14px;">
+              <h4 style="font-size: 0.85rem; color: #fff; margin-bottom: 10px;">Post-Maneuver Trajectory Projection</h4>
+              <div class="metrics-grid" style="margin-bottom: 0;">
+                <div class="metric-card nominal">
+                  <span class="metric-label">Projected Miss Distance</span>
+                  <span class="metric-value" id="proj-miss-dist" style="color: var(--color-nominal);">2,450 m</span>
+                  <span class="metric-subtext">Clear of 500m threshold</span>
+                </div>
+                <div class="metric-card nominal">
+                  <span class="metric-label">Projected Pc</span>
+                  <span class="metric-value" id="proj-pc" style="color: var(--color-nominal);">&lt; 1.0e-07</span>
+                  <span class="metric-subtext">Negligible risk</span>
+                </div>
+                <div class="metric-card cyan">
+                  <span class="metric-label">Fuel Mass Burned</span>
+                  <span class="metric-value" id="proj-fuel-cost" style="color: var(--color-cyan);">0.49 kg</span>
+                  <span class="metric-subtext">0.38% of reserve</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Propellant Reserve Impact & Flight Director Handoff -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Propellant Budget Impact</span>
+          </div>
+          <div class="panel-body">
+            <div class="telemetry-hud-card">
+              <div class="propellant-gauge">
+                <div class="propellant-label-row">
+                  <span>POST-BURN ESTIMATED RESERVE</span>
+                  <span class="mono" id="post-burn-fuel-text">128.01 / 200.0 kg</span>
+                </div>
+                <div class="propellant-bar-track">
+                  <div class="propellant-bar-fill" id="post-burn-fuel-bar" style="width: 64%;"></div>
+                </div>
+              </div>
+
+              <table class="orbital-elements-table" style="margin-top: 10px;">
+                <tbody>
+                  <tr><td>Thruster Isp</td><td id="plan-isp">220.0 s</td></tr>
+                  <tr><td>Pre-Burn Spacecraft Mass</td><td id="plan-mass">1,250.0 kg</td></tr>
+                  <tr><td>Post-Burn Spacecraft Mass</td><td id="plan-post-mass">1,249.51 kg</td></tr>
+                  <tr><td>Estimated Burn Duration</td><td id="plan-burn-duration">3.4 seconds</td></tr>
+                  <tr><td>Risk Reduction</td><td style="color: var(--color-nominal); font-weight: 700;" id="plan-risk-reduction">99.98%</td></tr>
+                </tbody>
+              </table>
+
+              <div style="margin-top: 14px;">
+                <button class="btn btn-primary" id="btn-submit-to-flight-director" style="width: 100%;">
+                  TRANSMIT PLAN TO FLIGHT DIRECTOR →
+                </button>
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-top: 6px;">
+                  Plan requires Flight Director validation and explicit operator approval before execution.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/maneuvers.js"></script>
+</body>
+</html>

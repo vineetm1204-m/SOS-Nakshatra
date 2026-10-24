@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOS — Settings & Data Sources</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="app-shell">
+  <sos-nav-header></sos-nav-header>
+
+  <main class="main-content">
+    <section class="page-header">
+      <div class="page-title-group">
+        <h1>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          System Configuration &amp; Data Sources
+        </h1>
+        <p>Operational screening thresholds, surveillance feed provenance, and telemetry parameters.</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-restore-defaults">RESTORE DEFAULTS</button>
+      </div>
+    </section>
+
+    <!-- Settings Feedback Alert -->
+    <div id="settings-alert-banner" style="display: none; padding: 10px 14px; margin-bottom: 16px; border-radius: var(--border-radius-xs); font-size: 0.8rem;"></div>
+
+    <div class="ops-grid">
+      <!-- Left: Operational Thresholds Form -->
+      <div class="ops-panel">
+        <div class="panel-header">
+          <span class="panel-title">Safety Thresholds &amp; Screening Parameters</span>
+          <span class="badge badge-cyan">NASA / ESA STANDARDS</span>
+        </div>
+        <div class="panel-body">
+          <form id="settings-form">
+            <div style="margin-bottom: 16px;">
+              <label class="metric-label" for="setting-data-mode" style="display: block; margin-bottom: 6px;">
+                Operating Data Mode
+              </label>
+              <select id="setting-data-mode" class="search-input" style="width: 100%;">
+                <option value="DEMO">DEMO DATA (Deterministic Space Surveillance Network Sim)</option>
+                <option value="LIVE_SIMULATED">LIVE SIMULATED TELEMETRY FEED (Active Epoch Clock)</option>
+              </select>
+              <span style="font-size: 0.7rem; color: var(--text-muted); display: block; margin-top: 4px;">
+                Clearly discloses data provenance on all dashboards.
+              </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div>
+                <label class="metric-label" for="setting-crit-miss" style="display: block; margin-bottom: 6px;">
+                  Critical Miss Distance Threshold (km)
+                </label>
+                <input type="number" step="0.05" min="0.1" max="5.0" class="search-input" id="setting-crit-miss" style="width: 100%;" value="0.5">
+                <span style="font-size: 0.7rem; color: var(--text-muted);">Triggers immediate RED alert (&lt; 500m)</span>
+              </div>
+              <div>
+                <label class="metric-label" for="setting-warn-miss" style="display: block; margin-bottom: 6px;">
+                  Warning Miss Distance Threshold (km)
+                </label>
+                <input type="number" step="0.1" min="0.5" max="10.0" class="search-input" id="setting-warn-miss" style="width: 100%;" value="2.0">
+                <span style="font-size: 0.7rem; color: var(--text-muted);">Triggers YELLOW watch state (&lt; 2 km)</span>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+              <label class="metric-label" for="setting-crit-pc" style="display: block; margin-bottom: 6px;">
+                Critical Collision Probability (Pc) Redline
+              </label>
+              <input type="number" step="0.00001" min="0.00001" max="0.01" class="search-input" id="setting-crit-pc" style="width: 100%; font-family: var(--font-mono);" value="0.0001">
+              <span style="font-size: 0.7rem; color: var(--text-muted);">Standard industry threshold: 1.0e-04 (1 in 10,000)</span>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+              <label class="metric-label" for="setting-operator-callsign" style="display: block; margin-bottom: 6px;">
+                Operator Station Callsign
+              </label>
+              <input type="text" class="search-input" id="setting-operator-callsign" style="width: 100%;" value="OPS-ALPHA-LEAD">
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="btn-save-settings">
+              SAVE OPERATIONAL CONFIGURATION
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Right: Active Data Sources & Surveillance Integrations -->
+      <div class="ops-panel">
+        <div class="panel-header">
+          <span class="panel-title">Active Surveillance Integrations</span>
+          <span class="badge badge-nominal">FEED HEALTHY</span>
+        </div>
+        <div class="panel-body">
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th>Source Feed</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>SSN-Sim Catalog</strong></td>
+                <td>Synthesized TLE</td>
+                <td><span class="badge badge-nominal">ACTIVE</span></td>
+                <td class="mono">12 ms</td>
+              </tr>
+              <tr>
+                <td><strong>Space-Track / Celestrak</strong></td>
+                <td>Ephemeris Proxy</td>
+                <td><span class="badge badge-cyan">STANDBY</span></td>
+                <td class="mono">84 ms</td>
+              </tr>
+              <tr>
+                <td><strong>ESA DISCOS Debris</strong></td>
+                <td>Cross-Section</td>
+                <td><span class="badge badge-nominal">LOADED</span></td>
+                <td class="mono">45 ms</td>
+              </tr>
+              <tr>
+                <td><strong>KSAT Ground Network</strong></td>
+                <td>Telemetry Lock</td>
+                <td><span class="badge badge-nominal">6/6 ONLINE</span></td>
+                <td class="mono">18 ms</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 18px; padding: 12px; background: var(--bg-surface-raised); border-radius: var(--border-radius-xs); border: 1px solid var(--border-subtle);">
+            <div style="font-weight: 600; color: #fff; font-size: 0.8rem; margin-bottom: 4px;">Zero Fabricated Telemetry Guarantee</div>
+            <p style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.45;">
+              All data presented in SOS is strictly verified against configured provenance channels. Simulated scenarios are never misrepresented as live spacecraft passes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="js/components/nav-header.js"></script>
+  <script type="module" src="js/pages/settings.js"></script>
+</body>
+</html>
