@@ -373,12 +373,15 @@ export interface WorkflowStatus {
   currentState: WorkflowState;
   selectedSatelliteId: string;
   selectedConjunctionId: string;
+  activeConjunctionId?: string | null;
   hasCandidateManeuver: boolean;
+  candidateManeuver?: ManeuverCandidate | null;
   operatorApproved: boolean;
   burnExecuting: boolean;
-  verificationStatus: 'PENDING' | 'ILLUSTRATIVE_VERIFIED' | 'PHYSICAL_VERIFIED' | 'BLOCKED';
+  verificationStatus: 'UNVERIFIED' | 'PENDING' | 'ILLUSTRATIVE_VERIFIED' | 'PHYSICAL_VERIFIED' | 'BLOCKED';
   history: WorkflowTransitionRecord[];
   lastUpdated: string;
+  burnResult?: Record<string, any>;
 }
 
 export const WorkflowStateSchema = z.enum([

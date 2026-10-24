@@ -110,9 +110,14 @@ describe('Workflow Service — Phase 7 End-to-End Operational Pipeline', () => {
   });
 
   it('blocks transition to MANEUVER_CANDIDATE_CREATED if candidateManeuver is missing', async () => {
-    // Move to CONJUNCTION_DETECTED first
+    // Move to CONJUNCTION_DETECTED then ASSESSMENT_COMPLETE first
     await workflowService.transition({
       toState: 'CONJUNCTION_DETECTED',
+      conjunctionId: conjId,
+      satelliteId: satId
+    });
+    await workflowService.transition({
+      toState: 'ASSESSMENT_COMPLETE',
       conjunctionId: conjId,
       satelliteId: satId
     });
