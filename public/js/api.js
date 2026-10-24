@@ -88,6 +88,18 @@ export class ApiClient {
     return this.get(`/maneuvers/candidate/${encodeURIComponent(conjunctionId)}`);
   }
 
+  static async calculateManeuver(payload) {
+    return this.post('/maneuvers/calculate', payload);
+  }
+
+  static async saveCandidateManeuver(candidate, projection) {
+    return this.post('/maneuvers/save', { candidate, projection });
+  }
+
+  static async resetCandidateManeuver() {
+    return this.post('/maneuvers/reset', {});
+  }
+
   static async getFlightDirectorAssessment(conjunctionId) {
     return this.get(`/flight-director/assessment/${encodeURIComponent(conjunctionId)}`);
   }

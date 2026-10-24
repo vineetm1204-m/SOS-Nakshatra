@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import { scenarioRepository } from './services/ScenarioRepository.js';
+import { ManeuverService } from './services/ManeuverService.js';
 import { DEFAULT_SETTINGS } from './data/seedData.js';
 import { FleetSummary, SystemSettings } from './types.js';
 
@@ -146,6 +147,61 @@ app.get('/api/v1/maneuvers/candidate/:conjunctionId', async (req: Request, res: 
     return;
   }
   res.json({ data: { candidate: maneuver, projection } });
+});
+
+app.post('/api/v1/maneuvers/calculate', async (req: Request, res: Response) => {
+  try {
+    const { 
+      spacecraftMassKg, 
+      fuelCapacityKg, 
+      remainingFuelKg, 
+      specificImpulseSeconds, 
+      deltaVMagnitudeMps, 
+      burnDirection, 
+      timeBeforeTcaSeconds, 
+      baselineMissDistanceKm, 
+      baselinePc 
+    } = req.body;
+
+    const evaluation = ManeuverService.evaluateManeuverCandidate({
+      spacecraftMassKg: typeof spacecraftMassKg === 'number' ? spacecraftMassKg : 1250,
+      fuelCapacityKg: typeof fuelCapacityKg === 'number' ? fuelCapacityKg : 200,
+      remainingFuelKg: typeof remainingFuelKg === 'number' ? remainingFuelKg : 128.5,
+      specificImpulseSeconds: typeof specificImpulseSeconds === 'number' ? specificImpulseSeconds : 220,
+      deltaVMagnitudeMps: typeof deltaVMagnitudeMps === 'number' ? deltaVMagnitudeMps : 0.85,
+      burnDirection: burnDirection || 'ALONG_TRACK_POS',
+      timeBeforeTcaSeconds: typeof timeBeforeTcaSeconds === 'number' ? timeBeforeTcaSeconds : 9000,
+      baselineMissDistanceKm: baselineMissDistanceKm || { total: 0.184, radial: -0.042, inTrack: 0.165, crossTrack: 0.071 },
+      baselinePc: typeof baselinePc === 'number' ? baselinePc : 0.00482
+    });
+
+    res.json({ data: evaluation });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Maneuver evaluation failed.' });
+  }
+});
+
+app.post('/api/v1/maneuvers/save', async (req: Request, res: Response) => {
+  try {
+    const { candidate, projection } = req.body;
+    if (!candidate || !candidate.id) {
+      res.status(400).json({ error: 'Invalid candidate payload.' });
+      return;
+    }
+    const saved = await scenarioRepository.saveCandidateManeuver(candidate, projection);
+    res.json({ data: saved, message: 'Candidate maneuver successfully persisted.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to save candidate.' });
+  }
+});
+
+app.post('/api/v1/maneuvers/reset', async (_req: Request, res: Response) => {
+  try {
+    const resetCandidate = await scenarioRepository.resetCandidateManeuver();
+    res.json({ data: resetCandidate, message: 'Candidate maneuver reset to default baseline.' });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to reset candidate.' });
+  }
 });
 
 // 7. Flight Director Assessment

@@ -34,6 +34,8 @@ export interface IScenarioDataProvider {
   getConjunctionById(id: string): Promise<ConjunctionEvent | undefined>;
   getCandidateManeuver(conjunctionId: string): Promise<ManeuverCandidate | undefined>;
   getPostManeuverProjection(conjunctionId: string): Promise<PostManeuverProjection | undefined>;
+  saveCandidateManeuver(candidate: ManeuverCandidate, projection?: PostManeuverProjection): Promise<ManeuverCandidate>;
+  resetCandidateManeuver(): Promise<ManeuverCandidate>;
   getFlightDirectorAssessment(conjunctionId: string): Promise<FlightDirectorAssessment | undefined>;
   getEvents(filters?: { category?: string; severity?: string; limit?: number }): Promise<OperationalEvent[]>;
   getDeterministicScenario(): Promise<DeterministicScenario>;
@@ -109,6 +111,20 @@ export class DemoScenarioProvider implements IScenarioDataProvider {
       return { ...this.postManeuverProjection };
     }
     return undefined;
+  }
+
+  async saveCandidateManeuver(candidate: ManeuverCandidate, projection?: PostManeuverProjection): Promise<ManeuverCandidate> {
+    this.candidateManeuver = { ...candidate };
+    if (projection) {
+      this.postManeuverProjection = { ...projection };
+    }
+    return { ...this.candidateManeuver };
+  }
+
+  async resetCandidateManeuver(): Promise<ManeuverCandidate> {
+    this.candidateManeuver = { ...SEED_CANDIDATE_MANEUVER };
+    this.postManeuverProjection = { ...SEED_POST_MANEUVER_PROJECTION };
+    return { ...this.candidateManeuver };
   }
 
   async getFlightDirectorAssessment(conjunctionId: string): Promise<FlightDirectorAssessment | undefined> {
@@ -238,6 +254,12 @@ export class LiveScenarioProvider implements IScenarioDataProvider {
     throw new Error('Live telemetry provider requires configured uplink credentials.');
   }
   async getPostManeuverProjection(): Promise<PostManeuverProjection | undefined> {
+    throw new Error('Live telemetry provider requires configured uplink credentials.');
+  }
+  async saveCandidateManeuver(): Promise<ManeuverCandidate> {
+    throw new Error('Live telemetry provider requires configured uplink credentials.');
+  }
+  async resetCandidateManeuver(): Promise<ManeuverCandidate> {
     throw new Error('Live telemetry provider requires configured uplink credentials.');
   }
   async getFlightDirectorAssessment(): Promise<FlightDirectorAssessment | undefined> {

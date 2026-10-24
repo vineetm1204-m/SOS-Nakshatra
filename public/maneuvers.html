@@ -3,154 +3,507 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SOS — Collision Avoidance Maneuver Planner</title>
+  <title>SOS — Collision Avoidance Maneuver Planner (CAM)</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .param-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .param-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .input-field-sm {
+      background: var(--bg-space);
+      border: 1px solid var(--border-medium);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 4px 8px;
+      border-radius: var(--border-radius-xs);
+      text-align: right;
+      width: 90px;
+    }
+    .input-field-sm:focus {
+      outline: none;
+      border-color: var(--color-cyan);
+    }
+    .preset-btn-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .preset-btn {
+      flex: 1;
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      padding: 4px 6px;
+      border-radius: var(--border-radius-xs);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .preset-btn:hover {
+      border-color: var(--color-cyan);
+      color: var(--text-primary);
+      background: var(--bg-surface-hover);
+    }
+    .calc-status-strip {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: var(--border-radius-xs);
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+    }
+    .calc-status-strip.error {
+      background: rgba(255, 51, 75, 0.1);
+      border-color: rgba(255, 51, 75, 0.4);
+      color: var(--color-critical);
+    }
+    .calc-status-strip.pass {
+      background: rgba(0, 230, 118, 0.08);
+      border-color: rgba(0, 230, 118, 0.4);
+      color: var(--color-nominal);
+    }
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+    }
+    .comparison-table th {
+      text-align: left;
+      padding: 6px 8px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-medium);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+    }
+    .comparison-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-family: var(--font-mono);
+    }
+    .gain-positive {
+      color: var(--color-nominal);
+      font-weight: 700;
+    }
+    .tradeoff-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 2px;
+      font-size: 0.65rem;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+    .tradeoff-low { background: rgba(0, 230, 118, 0.15); color: var(--color-nominal); }
+    .tradeoff-med { background: rgba(255, 179, 0, 0.15); color: var(--color-advisory); }
+    .tradeoff-high { background: rgba(255, 51, 75, 0.15); color: var(--color-critical); }
+  </style>
 </head>
 <body class="app-shell">
   <sos-nav-header></sos-nav-header>
 
   <main class="main-content">
+    <!-- Header with Operational Context and Actions -->
     <section class="page-header">
       <div class="page-title-group">
         <h1>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
           Collision Avoidance Maneuver Planner (CAM)
         </h1>
-        <p>Optimal Delta-V trajectory optimization, propellant budget solver, and burn timing windows.</p>
+        <p>Independent Tsiolkovsky propellant calculation engine & Clohessy-Wiltshire (RIC) relative encounter evaluation.</p>
       </div>
-      <div class="page-actions">
-        <a href="conjunction.html" class="btn btn-secondary">← BACK TO CONJUNCTION</a>
+      <div class="page-actions" style="display: flex; gap: 8px;">
+        <button id="btn-reset-candidate" class="btn btn-secondary" title="Restore candidate parameters to initial defaults without mutating baseline scenario">
+          ↺ RESET CANDIDATE
+        </button>
+        <button id="btn-save-candidate" class="btn btn-secondary" title="Persist candidate maneuver to operational repository">
+          💾 SAVE CANDIDATE
+        </button>
+        <button id="btn-continue-review" class="btn btn-primary" title="Proceed to Flight Director review with candidate parameters">
+          CONTINUE TO FLIGHT DIRECTOR REVIEW →
+        </button>
       </div>
     </section>
 
-    <!-- Context Banner -->
-    <div class="filter-bar" style="background: var(--bg-surface); padding: 10px 14px; border: 1px solid var(--border-subtle); border-radius: var(--border-radius-sm);">
-      <div class="filter-group">
-        <span class="metric-label">PLANNING CONJUNCTION:</span>
-        <strong id="plan-conj-code" style="color: #ffd54f;">CONJ-2026-084</strong>
-        <span style="color: var(--text-muted); margin: 0 8px;">|</span>
-        <span class="metric-label">TARGET SPACECRAFT:</span>
-        <strong id="plan-sat-name" style="color: var(--color-cyan);">SENTINEL-X</strong>
-      </div>
-      <div>
-        <span class="badge badge-warning" id="plan-status-badge">CAM DRAFTING</span>
+    <!-- Selected Spacecraft & Conjunction Summary Banner -->
+    <div class="filter-bar" style="background: var(--bg-surface); padding: 12px 16px; border: 1px solid var(--border-medium); border-radius: var(--border-radius-sm); margin-bottom: 16px;">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; width: 100%; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <div>
+            <span class="param-label">CONJUNCTION EVENT:</span>
+            <strong id="plan-conj-code" style="color: #ffd54f; font-family: var(--font-mono); margin-left: 4px;">CONJ-2026-084</strong>
+          </div>
+          <span style="color: var(--border-medium);">|</span>
+          <div>
+            <span class="param-label">TARGET SPACECRAFT:</span>
+            <strong id="plan-sat-name" style="color: var(--color-cyan); font-family: var(--font-mono); margin-left: 4px;">SENTINEL-X (SAT-LEO-02)</strong>
+          </div>
+          <span style="color: var(--border-medium);">|</span>
+          <div>
+            <span class="param-label">SECONDARY THREAT:</span>
+            <strong id="plan-threat-name" style="color: var(--color-critical); font-family: var(--font-mono); margin-left: 4px;">COSMOS 1408 DEBRIS</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div>
+            <span class="param-label">BASELINE MISS:</span>
+            <span id="plan-base-miss" class="mono" style="color: var(--color-critical); font-weight: 700; margin-left: 4px;">184 m</span>
+          </div>
+          <span style="color: var(--border-medium);">|</span>
+          <div>
+            <span class="param-label">BASELINE Pc:</span>
+            <span id="plan-base-pc" class="mono" style="color: var(--color-critical); font-weight: 700; margin-left: 4px;">4.82e-03</span>
+          </div>
+          <span class="badge badge-warning" id="plan-status-badge">CANDIDATE DRAFT</span>
+        </div>
       </div>
     </div>
 
-    <!-- Planner Grid -->
-    <div class="ops-grid" style="margin-top: 16px;">
-      <!-- Left: Maneuver Controls and Burn Profile -->
+    <!-- Main Workspace Grid: Controls (Left) vs Predictions & Impact (Right) -->
+    <div style="display: grid; grid-template-columns: 1.15fr 1.35fr; gap: 16px; align-items: start;">
+      
+      <!-- LEFT COLUMN: Maneuver Definition & Inputs -->
       <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Panel 1: Maneuver Vector & Execution Parameters -->
         <div class="ops-panel">
           <div class="panel-header">
-            <span class="panel-title">Maneuver Parameter Solver</span>
-            <span class="badge badge-neutral">TSIOLKOVSKY SOLVER</span>
+            <span class="panel-title">Maneuver Parameter Controls</span>
+            <span class="badge badge-neutral" id="maneuver-type-label">IMPULSIVE COLLISION AVOIDANCE</span>
           </div>
           <div class="panel-body">
-            <!-- Burn Direction Selection -->
+            
+            <!-- Model & Frame Specification -->
+            <div style="margin-bottom: 14px; padding: 8px 10px; background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs);">
+              <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-secondary);">
+                <span>PROPULSION: <strong style="color: #fff;">Hydrazine Monopropellant</strong></span>
+                <span>COORDINATE FRAME: <strong style="color: var(--color-cyan);">RIC (Hill LVLH)</strong></span>
+                <span>MODEL: <strong style="color: var(--color-nominal);">Impulsive (Δv)</strong></span>
+              </div>
+            </div>
+
+            <!-- Execution Time Lead-Time Input -->
             <div style="margin-bottom: 18px;">
-              <span class="metric-label" style="display: block; margin-bottom: 8px;">Burn Vector Orientation</span>
+              <div class="param-row">
+                <span class="param-label">Burn Execution Lead Time Before TCA</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="number" id="input-lead-hours" class="input-field-sm" min="0.5" max="12.0" step="0.25" value="2.50">
+                  <span class="mono" style="font-size: 0.75rem; color: var(--text-muted);">hrs</span>
+                </div>
+              </div>
+              <input type="range" id="slider-lead-hours" min="0.5" max="6.0" step="0.25" value="2.5" style="width: 100%; accent-color: var(--color-cyan); cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
+                <span>0.5 hrs (Late Emergency)</span>
+                <span id="lead-seconds-display" class="mono" style="color: var(--color-cyan);">9,000 s before TCA</span>
+                <span>6.0 hrs (Early Optimum)</span>
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 6px;">
+                Calculated Burn Epoch: <span class="mono" id="burn-epoch-display" style="color: #fff; font-weight: 600;">2026-10-24 11:45:00 UTC</span>
+              </div>
+            </div>
+
+            <!-- Burn Vector Orientation in RIC Frame -->
+            <div style="margin-bottom: 18px;">
+              <span class="param-label" style="display: block; margin-bottom: 8px;">Burn Vector Direction (RIC Frame)</span>
               <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                <button class="filter-btn burn-dir-btn active" data-dir="ALONG_TRACK_POS">
+                <button class="filter-btn burn-dir-btn active" data-dir="ALONG_TRACK_POS" id="btn-dir-pos-t">
                   +IN-TRACK<br><small style="font-size: 0.65rem; color: var(--text-muted);">Prograde (Raise)</small>
                 </button>
-                <button class="filter-btn burn-dir-btn" data-dir="ALONG_TRACK_NEG">
+                <button class="filter-btn burn-dir-btn" data-dir="ALONG_TRACK_NEG" id="btn-dir-neg-t">
                   -IN-TRACK<br><small style="font-size: 0.65rem; color: var(--text-muted);">Retrograde (Lower)</small>
                 </button>
-                <button class="filter-btn burn-dir-btn" data-dir="CROSS_TRACK">
+                <button class="filter-btn burn-dir-btn" data-dir="CROSS_TRACK" id="btn-dir-cross">
                   CROSS-TRACK<br><small style="font-size: 0.65rem; color: var(--text-muted);">Out-of-Plane</small>
                 </button>
-                <button class="filter-btn burn-dir-btn" data-dir="RADIAL">
-                  RADIAL<br><small style="font-size: 0.65rem; color: var(--text-muted);">Eccentricity</small>
+                <button class="filter-btn burn-dir-btn" data-dir="RADIAL" id="btn-dir-radial">
+                  RADIAL<br><small style="font-size: 0.65rem; color: var(--text-muted);">Apsidal Tilt</small>
                 </button>
               </div>
             </div>
 
-            <!-- Delta-V Target Slider & Input -->
-            <div style="margin-bottom: 20px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span class="metric-label">Impulse Magnitude (Delta-V Target)</span>
-                <span class="mono" id="slider-val-display" style="font-size: 1.1rem; color: var(--color-cyan); font-weight: 700;">0.85 m/s</span>
+            <!-- Delta-V Magnitude Control & Direct Input -->
+            <div style="margin-bottom: 18px;">
+              <div class="param-row">
+                <span class="param-label">Delta-V Magnitude (Δv)</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="number" id="input-delta-v" class="input-field-sm" min="0.05" max="5.00" step="0.05" value="0.85">
+                  <span class="mono" style="font-size: 0.75rem; color: var(--color-cyan); font-weight: 700;">m/s</span>
+                </div>
               </div>
-              <input type="range" id="delta-v-slider" min="0.10" max="3.00" step="0.05" value="0.85" style="width: 100%; accent-color: var(--color-cyan); cursor: pointer;">
-              <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted); margin-top: 4px;">
-                <span>0.10 m/s (Minimum RCS pulse)</span>
-                <span>1.50 m/s (Recommended)</span>
-                <span>3.00 m/s (High delta)</span>
+              <input type="range" id="slider-delta-v" min="0.05" max="3.00" step="0.05" value="0.85" style="width: 100%; accent-color: var(--color-cyan); cursor: pointer;">
+              
+              <!-- Presets with calculation trigger -->
+              <div class="preset-btn-group">
+                <button class="preset-btn" data-deltav="0.15">MIN RCS (0.15 m/s)</button>
+                <button class="preset-btn" data-deltav="0.85">TARGET CLEAR (0.85 m/s)</button>
+                <button class="preset-btn" data-deltav="1.50">HIGH MARGIN (1.50 m/s)</button>
+                <button class="preset-btn" data-deltav="2.50">MAX EVASION (2.50 m/s)</button>
               </div>
             </div>
 
-            <!-- Projected Outcomes Comparison Table -->
-            <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 14px;">
-              <h4 style="font-size: 0.85rem; color: #fff; margin-bottom: 10px;">Post-Maneuver Trajectory Projection</h4>
-              <div class="metrics-grid" style="margin-bottom: 0;">
-                <div class="metric-card nominal">
-                  <span class="metric-label">Projected Miss Distance</span>
-                  <span class="metric-value" id="proj-miss-dist" style="color: var(--color-nominal);">2,450 m</span>
-                  <span class="metric-subtext">Clear of 500m threshold</span>
+            <!-- Spacecraft Physical Properties (Validated) -->
+            <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 10px 12px; margin-bottom: 16px;">
+              <span class="param-label" style="display: block; margin-bottom: 8px;">Propulsion Parameters (Tsiolkovsky Inputs)</span>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <div>
+                  <div style="font-size: 0.68rem; color: var(--text-muted);">INITIAL WET MASS (m₀)</div>
+                  <div class="mono" id="prop-mass-display" style="font-size: 0.85rem; color: #fff;">1,250.0 kg</div>
                 </div>
-                <div class="metric-card nominal">
-                  <span class="metric-label">Projected Pc</span>
-                  <span class="metric-value" id="proj-pc" style="color: var(--color-nominal);">&lt; 1.0e-07</span>
-                  <span class="metric-subtext">Negligible risk</span>
+                <div>
+                  <div style="font-size: 0.68rem; color: var(--text-muted);">SPECIFIC IMPULSE (Isp)</div>
+                  <div class="mono" id="prop-isp-display" style="font-size: 0.85rem; color: #fff;">220.0 s</div>
                 </div>
-                <div class="metric-card cyan">
-                  <span class="metric-label">Fuel Mass Burned</span>
-                  <span class="metric-value" id="proj-fuel-cost" style="color: var(--color-cyan);">0.49 kg</span>
-                  <span class="metric-subtext">0.38% of reserve</span>
+                <div>
+                  <div style="font-size: 0.68rem; color: var(--text-muted);">GRAVITY (g₀)</div>
+                  <div class="mono" style="font-size: 0.85rem; color: var(--text-secondary);">9.80665 m/s²</div>
                 </div>
               </div>
             </div>
+
+            <!-- Calculation Action & Status -->
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button class="btn btn-primary" id="btn-recalculate" style="width: 100%; justify-content: center; padding: 10px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+                CALCULATE MANEUVER IMPACT
+              </button>
+              
+              <div class="calc-status-strip pass" id="calc-status-banner">
+                <span id="calc-status-text">CALCULATED: Tsiolkovsky Ideal Rocket Equation & CW Trajectory Model</span>
+                <span class="mono" id="calc-status-time">LIVE</span>
+              </div>
+            </div>
+
           </div>
         </div>
-      </div>
 
-      <!-- Right: Propellant Reserve Impact & Flight Director Handoff -->
-      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- Panel 2: Assumptions and Limitations Panel -->
         <div class="ops-panel">
           <div class="panel-header">
-            <span class="panel-title">Propellant Budget Impact</span>
+            <span class="panel-title">Assumptions & Limitations Panel</span>
+            <span class="badge badge-neutral">ASTRODYNAMICS AUDIT</span>
           </div>
-          <div class="panel-body">
-            <div class="telemetry-hud-card">
-              <div class="propellant-gauge">
-                <div class="propellant-label-row">
-                  <span>POST-BURN ESTIMATED RESERVE</span>
-                  <span class="mono" id="post-burn-fuel-text">128.01 / 200.0 kg</span>
-                </div>
-                <div class="propellant-bar-track">
-                  <div class="propellant-bar-fill" id="post-burn-fuel-bar" style="width: 64%;"></div>
-                </div>
-              </div>
+          <div class="panel-body" style="font-size: 0.72rem; line-height: 1.6;">
+            <div style="margin-bottom: 10px; color: var(--text-secondary);">
+              <strong style="color: var(--color-cyan);">Calculation Method:</strong> Tsiolkovsky Rocket Equation for ideal propellant consumption + Linearized Clohessy-Wiltshire (Hill/RIC) relative encounter equations.
+            </div>
 
-              <table class="orbital-elements-table" style="margin-top: 10px;">
-                <tbody>
-                  <tr><td>Thruster Isp</td><td id="plan-isp">220.0 s</td></tr>
-                  <tr><td>Pre-Burn Spacecraft Mass</td><td id="plan-mass">1,250.0 kg</td></tr>
-                  <tr><td>Post-Burn Spacecraft Mass</td><td id="plan-post-mass">1,249.51 kg</td></tr>
-                  <tr><td>Estimated Burn Duration</td><td id="plan-burn-duration">3.4 seconds</td></tr>
-                  <tr><td>Risk Reduction</td><td style="color: var(--color-nominal); font-weight: 700;" id="plan-risk-reduction">99.98%</td></tr>
-                </tbody>
-              </table>
+            <div style="margin-bottom: 8px;">
+              <strong style="color: #fff; text-transform: uppercase; font-size: 0.68rem;">Physical Assumptions:</strong>
+              <ul style="padding-left: 18px; color: var(--text-secondary); margin-top: 4px;" id="list-assumptions">
+                <li>Impulsive velocity increment model (instantaneous delta-v approximation).</li>
+                <li>Hydrazine monopropellant thruster specific impulse Isp = 220.0 seconds.</li>
+                <li>Standard gravitational acceleration g₀ = 9.80665 m/s² strictly applied.</li>
+                <li>RIC (Radial, In-Track, Cross-Track) orbital local coordinate frame.</li>
+                <li>Perturbations ignored: Earth geopotential harmonics (J₂-J₄), atmospheric drag variability, solar radiation pressure, and third-body gravity.</li>
+              </ul>
+            </div>
 
-              <div style="margin-top: 14px;">
-                <button class="btn btn-primary" id="btn-submit-to-flight-director" style="width: 100%;">
-                  TRANSMIT PLAN TO FLIGHT DIRECTOR →
-                </button>
-                <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-top: 6px;">
-                  Plan requires Flight Director validation and explicit operator approval before execution.
-                </div>
-              </div>
+            <div>
+              <strong style="color: #ffd54f; text-transform: uppercase; font-size: 0.68rem;">Model Limitations:</strong>
+              <ul style="padding-left: 18px; color: var(--text-muted); margin-top: 4px;" id="list-limitations">
+                <li>Excludes implementation losses (thruster cosine canting, chamber pressure decay, ADCS slew settling).</li>
+                <li>Estimate represents an ideal propellant consumption lower bound.</li>
+                <li>Linearized encounter preview valid for Δv ≪ v_orbital; operational burn execution requires high-precision numerical ephemeris propagation before telecommand uplink.</li>
+              </ul>
             </div>
           </div>
         </div>
+
       </div>
+
+      <!-- RIGHT COLUMN: Impact Preview & Comparison Results -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Panel 3: Pre- and Post-Maneuver Separation Comparison -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Pre- vs. Post-Maneuver Separation Comparison</span>
+            <span class="badge badge-nominal" id="target-criteria-badge">TARGET CRITERIA SATISFIED</span>
+          </div>
+          <div class="panel-body">
+            
+            <!-- Metric Cards Comparison -->
+            <div class="metrics-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 16px;">
+              <div class="metric-card cyan">
+                <span class="metric-label">POST-MANEUVER MISS</span>
+                <span class="metric-value" id="card-post-miss" style="color: var(--color-cyan);">23,135 m</span>
+                <span class="metric-subtext" id="card-miss-gain">Gain: +22,951 m</span>
+              </div>
+              <div class="metric-card nominal">
+                <span class="metric-label">POST-MANEUVER Pc</span>
+                <span class="metric-value" id="card-post-pc" style="color: var(--color-nominal);">&lt; 1.0e-09</span>
+                <span class="metric-subtext" id="card-pc-reduction">Risk Reduction: 99.99%</span>
+              </div>
+              <div class="metric-card nominal">
+                <span class="metric-label">IDEAL PROPELLANT Δm</span>
+                <span class="metric-value" id="card-propellant-cost" style="color: #ffd54f;">0.493 kg</span>
+                <span class="metric-subtext" id="card-fuel-fraction">0.38% of reserve</span>
+              </div>
+            </div>
+
+            <!-- Detailed Component Table -->
+            <table class="comparison-table" style="margin-bottom: 16px;">
+              <thead>
+                <tr>
+                  <th>Encounter Metric</th>
+                  <th>Pre-Maneuver (Baseline)</th>
+                  <th>Candidate Post-Maneuver</th>
+                  <th>Net Separation Gain</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="color: var(--text-primary); font-weight: 600;">Total Miss Distance</td>
+                  <td id="tbl-pre-total" style="color: var(--color-critical);">184 m</td>
+                  <td id="tbl-post-total" style="color: var(--color-cyan); font-weight: 700;">23,135 m</td>
+                  <td id="tbl-gain-total" class="gain-positive">+22,951 m</td>
+                </tr>
+                <tr>
+                  <td>Radial (R) Separation</td>
+                  <td id="tbl-pre-radial">-42 m</td>
+                  <td id="tbl-post-radial">-39 m</td>
+                  <td id="tbl-gain-radial">+3 m</td>
+                </tr>
+                <tr>
+                  <td>In-Track (T) Separation</td>
+                  <td id="tbl-pre-in-track">+165 m</td>
+                  <td id="tbl-post-in-track" style="color: var(--color-nominal);">+23,115 m</td>
+                  <td id="tbl-gain-in-track" class="gain-positive">+22,950 m</td>
+                </tr>
+                <tr>
+                  <td>Cross-Track (N) Separation</td>
+                  <td id="tbl-pre-cross-track">+71 m</td>
+                  <td id="tbl-post-cross-track">+71 m</td>
+                  <td id="tbl-gain-cross-track">0 m</td>
+                </tr>
+                <tr>
+                  <td style="color: var(--text-primary); font-weight: 600;">Collision Probability (Pc)</td>
+                  <td id="tbl-pre-pc" style="color: var(--color-critical); font-weight: 700;">4.82e-03</td>
+                  <td id="tbl-post-pc" style="color: var(--color-nominal); font-weight: 700;">&lt; 1.0e-09</td>
+                  <td style="color: var(--color-nominal);">-4.82e-03 (CLEARED)</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- Target Criteria Checklist -->
+            <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 10px 12px;">
+              <span class="param-label" style="display: block; margin-bottom: 8px;">Target Criteria Compliance Audit</span>
+              <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.72rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>1. Minimum Miss Distance Threshold (≥ 500 m):</span>
+                  <span class="mono" id="check-miss-threshold" style="color: var(--color-nominal); font-weight: 700;">PASS (23,135 m ≥ 500 m)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>2. Maximum Allowable Collision Risk (Pc &lt; 1.0e-04):</span>
+                  <span class="mono" id="check-pc-threshold" style="color: var(--color-nominal); font-weight: 700;">PASS (&lt; 1.0e-09 &lt; 1.0e-04)</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span>3. Propellant Reserve Feasibility (&gt; 0 kg post-burn):</span>
+                  <span class="mono" id="check-fuel-threshold" style="color: var(--color-nominal); font-weight: 700;">PASS (128.01 kg remaining)</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Panel 4: Propellant Budget & Trade-Off Analysis -->
+        <div class="ops-panel">
+          <div class="panel-header">
+            <span class="panel-title">Tsiolkovsky Propellant Budget & Trade-Offs</span>
+            <span class="badge badge-neutral">FUEL MASS AUDIT</span>
+          </div>
+          <div class="panel-body">
+            
+            <div class="propellant-gauge" style="margin-bottom: 14px;">
+              <div class="propellant-label-row">
+                <span>ESTIMATED POST-BURN FUEL RESERVE</span>
+                <span class="mono" id="post-burn-fuel-text" style="color: #fff; font-weight: 700;">128.01 / 200.0 kg (64.0%)</span>
+              </div>
+              <div class="propellant-bar-track">
+                <div class="propellant-bar-fill" id="post-burn-fuel-bar" style="width: 64%;"></div>
+              </div>
+            </div>
+
+            <!-- Tsiolkovsky Equation Breakdown -->
+            <div style="background: var(--bg-surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--border-radius-xs); padding: 8px 12px; margin-bottom: 14px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary);">
+              <div>Δm = m₀ × (1 − exp(−Δv / (Isp × g₀)))</div>
+              <div style="margin-top: 4px; color: var(--color-cyan);" id="tsiolkovsky-formula-expanded">
+                Δm = 1250.0 kg × (1 − exp(−0.85 / (220.0 × 9.80665))) = 0.493 kg
+              </div>
+            </div>
+
+            <table class="orbital-elements-table" style="margin-bottom: 14px;">
+              <tbody>
+                <tr><td>Ideal Propellant Mass Burned (Δm)</td><td id="val-fuel-burned" class="mono" style="color: #ffd54f; font-weight: 700;">0.493 kg</td></tr>
+                <tr><td>Pre-Burn Spacecraft Wet Mass (m₀)</td><td id="val-pre-mass" class="mono">1,250.00 kg</td></tr>
+                <tr><td>Post-Burn Spacecraft Mass (m₁)</td><td id="val-post-mass" class="mono">1,249.51 kg</td></tr>
+                <tr><td>Estimated Steady-State Burn Duration</td><td id="val-burn-duration" class="mono">3.4 seconds</td></tr>
+                <tr><td>Delta-V Vector (RIC Frame)</td><td id="val-delta-vector" class="mono" style="color: var(--color-cyan);">[0.00, +0.85, 0.00] m/s</td></tr>
+              </tbody>
+            </table>
+
+            <!-- Trade-Off Exposure -->
+            <div style="border-top: 1px solid var(--border-subtle); padding-top: 10px;">
+              <span class="param-label" style="display: block; margin-bottom: 6px;">Operational Trade-Off Profile</span>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.7rem;">
+                <div style="background: var(--bg-surface-raised); padding: 6px 8px; border-radius: var(--border-radius-xs);">
+                  <div style="color: var(--text-muted); font-size: 0.65rem;">FUEL EXPENDITURE</div>
+                  <div style="margin-top: 2px;"><span class="tradeoff-badge tradeoff-low">MINIMAL IMPACT</span></div>
+                  <div style="color: var(--text-secondary); margin-top: 2px;">0.38% of tank reserve</div>
+                </div>
+                <div style="background: var(--bg-surface-raised); padding: 6px 8px; border-radius: var(--border-radius-xs);">
+                  <div style="color: var(--text-muted); font-size: 0.65rem;">TIMING SENSITIVITY</div>
+                  <div style="margin-top: 2px;"><span class="tradeoff-badge tradeoff-med">LEAD-TIME CRITICAL</span></div>
+                  <div style="color: var(--text-secondary); margin-top: 2px;">Gain scales with dt before TCA</div>
+                </div>
+                <div style="background: var(--bg-surface-raised); padding: 6px 8px; border-radius: var(--border-radius-xs);">
+                  <div style="color: var(--text-muted); font-size: 0.65rem;">MODEL CONFIDENCE</div>
+                  <div style="margin-top: 2px;"><span class="tradeoff-badge tradeoff-low">HIGH (CW VALID)</span></div>
+                  <div style="color: var(--text-secondary); margin-top: 2px;">Δv ≪ v_orb & dt &lt; 1 orbit</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Confirmation & Handoff Banner -->
+            <div style="margin-top: 16px; padding: 10px; background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: var(--border-radius-xs);">
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 8px;">
+                Ready to evaluate in Flight Director operations? Submitting will stage this candidate for simulated telemetry review and uplink authorization.
+              </div>
+              <button class="btn btn-primary" id="btn-submit-to-flight-director" style="width: 100%; justify-content: center;">
+                TRANSMIT CANDIDATE TO FLIGHT DIRECTOR →
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
     </div>
   </main>
 
