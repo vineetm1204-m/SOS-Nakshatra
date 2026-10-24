@@ -1,7 +1,7 @@
 /**
  * SOS 3D Orbital Scene Visualizer
  * Aerospace-grade interactive 3D Earth, orbit trajectories, and conjunction encounter visualizer.
- * Built with Three.js WebGL and graceful 2D Canvas fallback.
+ * Built with Three.js WebGL and photorealistic NASA Blue Marble Earth surface texture integration.
  */
 
 import { 
@@ -21,6 +21,9 @@ export class OrbitalSceneVisualizer {
     this.camera = null;
     this.renderer = null;
     this.earthGroup = null;
+    this.earthMesh = null;
+    this.earthMat = null;
+    this.cloudMesh = null;
     this.satellitesGroup = null;
     this.orbitsGroup = null;
     this.maneuverGroup = null;
@@ -30,6 +33,8 @@ export class OrbitalSceneVisualizer {
     this.isDisposed = false;
     this.showManeuverPreview = false;
     this.selectedSatId = store.getState().selectedSatelliteId || 'SAT-LEO-02';
+    this.loadedTextures = [];
+    this.textureStatus = 'INITIALIZING'; // 'INITIALIZING' | 'LOADING' | 'SURFACE_LOADED' | 'FALLBACK'
 
     // Camera control drag state
     this.isDragging = false;
@@ -95,7 +100,8 @@ export class OrbitalSceneVisualizer {
     const height = this.container.clientHeight || 400;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x04060a);
+    // Deep black space background matching reference image
+    this.scene.background = new THREE.Color(0x020306);
 
     this.camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 1000);
     this.updateCameraPosition();
@@ -103,6 +109,14 @@ export class OrbitalSceneVisualizer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    
+    // Set color management for Three.js
+    if (this.renderer.outputColorSpace !== undefined && THREE.SRGBColorSpace) {
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    } else if (this.renderer.outputEncoding !== undefined && THREE.sRGBEncoding) {
+      this.renderer.outputEncoding = THREE.sRGBEncoding;
+    }
+
     this.container.appendChild(this.renderer.domElement);
 
     // Coordinate Groups
@@ -116,13 +130,20 @@ export class OrbitalSceneVisualizer {
     this.scene.add(this.satellitesGroup);
     this.scene.add(this.maneuverGroup);
 
-    // Subtle Aerospace Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Balanced Photorealistic Lighting Setup
+    // 1. Soft global ambient illumination so the unlit hemisphere retains visible landmasses
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.48);
     this.scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    sunLight.position.set(50, 20, 30);
+    // 2. Key directional sunlight source highlighting continental topography & ocean glint
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.45);
+    sunLight.position.set(50, 25, 35);
     this.scene.add(sunLight);
+
+    // 3. Deep-space celestial fill light for realistic planetary contrast
+    const deepSpaceFillLight = new THREE.DirectionalLight(0x283b52, 0.35);
+    deepSpaceFillLight.position.set(-45, -15, -30);
+    this.scene.add(deepSpaceFillLight);
 
     // Window Resize Handler
     this.onResize = () => {
@@ -138,28 +159,27 @@ export class OrbitalSceneVisualizer {
 
   buildEarth() {
     const THREE = this.three;
-    const radius = EARTH_SCENE_RADIUS; // 6.378 scene units
+    const radius = EARTH_SCENE_RADIUS; // 6.378 scene units (WGS-84 scaled to 1 unit = 1000 km)
 
-    // 1. Earth Sphere Core (Deep ocean navy)
-    const earthGeo = new THREE.SphereGeometry(radius, 48, 48);
-    const earthMat = new THREE.MeshPhongMaterial({
-      color: 0x081324,
-      emissive: 0x030812,
-      specular: 0x182a44,
-      shininess: 12,
+    // 1. Earth Sphere Core (Equirectangular UV sphere with 64x64 segments for smooth curvature)
+    const earthGeo = new THREE.SphereGeometry(radius, 64, 64);
+    this.earthMat = new THREE.MeshPhongMaterial({
+      color: 0xffffff, // Natural surface coloration when textured
+      emissive: 0x010308,
+      specular: 0x223344,
+      shininess: 25,
       wireframe: false
     });
-    const earthMesh = new THREE.Mesh(earthGeo, earthMat);
-    this.earthGroup.add(earthMesh);
+    this.earthMesh = new THREE.Mesh(earthGeo, this.earthMat);
+    this.earthGroup.add(this.earthMesh);
 
-    // 2. Graticule Lines (Parallels and Meridians)
+    // 2. Graticule Lines (Parallels and Meridians - subtle aesthetic overlay)
     const graticuleMat = new THREE.LineBasicMaterial({
       color: 0x00e5ff,
       transparent: true,
-      opacity: 0.18
+      opacity: 0.10
     });
 
-    // Latitude rings (-60° to +60°)
     for (let lat = -60; lat <= 60; lat += 30) {
       const latRad = (lat * Math.PI) / 180;
       const ringRadius = radius * Math.cos(latRad);
@@ -180,7 +200,7 @@ export class OrbitalSceneVisualizer {
       equatorPts.push(new THREE.Vector3(radius * Math.cos(theta), 0, radius * Math.sin(theta)));
     }
     const equatorGeo = new THREE.BufferGeometry().setFromPoints(equatorPts);
-    const equatorMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.45 });
+    const equatorMat = new THREE.LineBasicMaterial({ color: 0x00e5ff, transparent: true, opacity: 0.28 });
     this.earthGroup.add(new THREE.Line(equatorGeo, equatorMat));
 
     // 3. Polar Axis Indicator
@@ -193,21 +213,132 @@ export class OrbitalSceneVisualizer {
       dashSize: 0.4,
       gapSize: 0.2,
       transparent: true,
-      opacity: 0.35
+      opacity: 0.25
     });
     const axisLine = new THREE.Line(axisGeo, axisMat);
     axisLine.computeLineDistances();
     this.earthGroup.add(axisLine);
 
-    // 4. Atmospheric Rim Glow
-    const atmosGeo = new THREE.SphereGeometry(radius * 1.025, 32, 32);
+    // 4. Atmospheric Rayleigh Rim Glow
+    const atmosGeo = new THREE.SphereGeometry(radius * 1.025, 48, 48);
     const atmosMat = new THREE.MeshBasicMaterial({
-      color: 0x00e5ff,
+      color: 0x00b4d8,
       transparent: true,
-      opacity: 0.08,
-      side: THREE.BackSide
+      opacity: 0.12,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending
     });
     this.earthGroup.add(new THREE.Mesh(atmosGeo, atmosMat));
+
+    // 5. Asynchronously Load High-Resolution NASA Blue Marble Earth Textures
+    this.loadEarthTextures();
+  }
+
+  loadEarthTextures() {
+    const THREE = this.three;
+    const loader = new THREE.TextureLoader();
+    this.textureStatus = 'LOADING';
+
+    const configureTexture = (tex) => {
+      if (THREE.SRGBColorSpace) {
+        tex.colorSpace = THREE.SRGBColorSpace;
+      } else if (THREE.sRGBEncoding) {
+        tex.encoding = THREE.sRGBEncoding;
+      }
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = true;
+      this.loadedTextures.push(tex);
+      return tex;
+    };
+
+    // 1. Primary Day Surface Texture (NASA Blue Marble 2048x1024 equirectangular)
+    loader.load(
+      '/assets/textures/earth-day.jpg',
+      (dayTex) => {
+        if (this.isDisposed || !this.earthMat) return;
+        configureTexture(dayTex);
+        this.earthMat.map = dayTex;
+        this.earthMat.color.setHex(0xffffff); // Natural surface illumination
+        this.earthMat.needsUpdate = true;
+        this.textureStatus = 'SURFACE_LOADED';
+        this.updateTextureStatusBadge('EARTH: PHOTOREALISTIC HD');
+      },
+      undefined,
+      (err) => {
+        console.warn('[SOS 3D Orbital Scene] earth-day.jpg texture load error; retaining procedural aerospace globe:', err);
+        if (this.earthMat) {
+          this.earthMat.color.setHex(0x081324);
+          this.earthMat.needsUpdate = true;
+        }
+        this.textureStatus = 'FALLBACK';
+        this.updateTextureStatusBadge('EARTH: PROCEDURAL GLOBE');
+      }
+    );
+
+    // 2. Specular Water Mask (Reflective oceans, matte landmasses)
+    loader.load(
+      '/assets/textures/earth-specular.jpg',
+      (specTex) => {
+        if (this.isDisposed || !this.earthMat) return;
+        this.loadedTextures.push(specTex);
+        this.earthMat.specularMap = specTex;
+        this.earthMat.specular.setHex(0x334455);
+        this.earthMat.shininess = 30;
+        this.earthMat.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        // Optional specular map - silent fallback if missing
+      }
+    );
+
+    // 3. Tangent Normal Map (Topographic mountain relief and ocean bathymetry)
+    loader.load(
+      '/assets/textures/earth-normal.jpg',
+      (normTex) => {
+        if (this.isDisposed || !this.earthMat) return;
+        this.loadedTextures.push(normTex);
+        this.earthMat.normalMap = normTex;
+        this.earthMat.normalScale = new THREE.Vector2(0.85, 0.85);
+        this.earthMat.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        // Optional normal map - silent fallback if missing
+      }
+    );
+
+    // 4. Atmospheric Cloud Layer (Drifting semi-transparent clouds at r * 1.008)
+    loader.load(
+      '/assets/textures/earth-clouds.png',
+      (cloudTex) => {
+        if (this.isDisposed || !this.earthGroup) return;
+        this.loadedTextures.push(cloudTex);
+        const radius = EARTH_SCENE_RADIUS;
+        const cloudGeo = new THREE.SphereGeometry(radius * 1.008, 48, 48);
+        const cloudMat = new THREE.MeshPhongMaterial({
+          map: cloudTex,
+          transparent: true,
+          opacity: 0.80,
+          blending: THREE.NormalBlending,
+          depthWrite: false
+        });
+        this.cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+        this.earthGroup.add(this.cloudMesh);
+      },
+      undefined,
+      () => {
+        // Optional cloud layer - silent fallback if missing
+      }
+    );
+  }
+
+  updateTextureStatusBadge(label) {
+    const badge = document.getElementById('legend-earth-texture');
+    if (badge) {
+      badge.textContent = label;
+    }
   }
 
   loadScenarioData(scenario) {
@@ -258,133 +389,144 @@ export class OrbitalSceneVisualizer {
       const orbitLine = new THREE.Line(orbitGeo, orbitMat);
       this.orbitsGroup.add(orbitLine);
 
-      // 2. Render Spacecraft / Debris Markers
-      const initialPos = transformEciToScene(
-        obj.stateVector.positionVectorKm.x,
-        obj.stateVector.positionVectorKm.y,
-        obj.stateVector.positionVectorKm.z
-      );
+      // 2. Render Satellite Mesh Node
+      const trueAnomaly = obj.orbit.trueAnomalyDeg || 0;
+      const initialEci = obj.stateVector ? obj.stateVector.position : { x: 0, y: 0, z: 0 };
+      const scenePos = transformEciToScene(initialEci.x, initialEci.y, initialEci.z);
 
-      const markerColor = isThreatSat ? 0x00e5ff : (isDebris ? 0xff334b : (obj.operationalStatus === 'DEGRADED' ? 0xffb300 : 0x00e676));
-      const markerSize = isThreatSat ? 0.32 : 0.22;
+      const satNode = this.buildSatelliteMarker(obj);
+      satNode.position.set(scenePos.x, scenePos.y, scenePos.z);
+      this.satellitesGroup.add(satNode);
+      this.satelliteMeshes.set(obj.id, satNode);
 
-      const markerGeo = new THREE.OctahedronGeometry(markerSize);
-      const markerMat = new THREE.MeshBasicMaterial({ color: markerColor });
-      const markerMesh = new THREE.Mesh(markerGeo, markerMat);
-      markerMesh.position.set(initialPos.x, initialPos.y, initialPos.z);
-      markerMesh.userData = { id: obj.id, name: obj.name, isThreat: isThreatSat };
-
-      this.satellitesGroup.add(markerMesh);
-      this.satelliteMeshes.set(obj.id, markerMesh);
-
-      // Add selection ring if selected
+      // Selected ring highlight
       if (obj.id === this.selectedSatId) {
-        this.addSelectionRing(markerMesh);
+        this.addSelectionRing(satNode);
       }
     }
 
-    // 3. Render Conjunction Node Marker & Relative Vector
+    // 3. Render Conjunction Node Marker (if available)
     if (featuredConj) {
-      this.renderConjunctionNode(featuredConj);
+      this.buildConjunctionMarker(featuredConj);
     }
 
-    // 4. Render Post-Maneuver Candidate Trajectory (Toggleable)
-    if (scenario.candidateManeuver) {
-      this.renderCandidatePostManeuverOrbit(scenario);
-    }
-  }
-
-  renderConjunctionNode(conj) {
-    const THREE = this.three;
-    // TCA Intersection Node Marker
-    const sentinelMesh = this.satelliteMeshes.get('SAT-LEO-02');
-    const debrisMesh = this.satelliteMeshes.get('DEB-1993-024CZ');
-
-    if (sentinelMesh && debrisMesh) {
-      // Connect with encounter vector line
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        sentinelMesh.position,
-        debrisMesh.position
-      ]);
-      const lineMat = new THREE.LineDashedMaterial({
-        color: 0xffd54f,
-        dashSize: 0.15,
-        gapSize: 0.1,
-        transparent: true,
-        opacity: 0.95
-      });
-      const relativeLine = new THREE.Line(lineGeo, lineMat);
-      relativeLine.computeLineDistances();
-      this.orbitsGroup.add(relativeLine);
-
-      // Warning sphere at encounter midpoint
-      const mid = new THREE.Vector3().addVectors(sentinelMesh.position, debrisMesh.position).multiplyScalar(0.5);
-      const nodeGeo = new THREE.RingGeometry(0.3, 0.45, 16);
-      const nodeMat = new THREE.MeshBasicMaterial({ color: 0xff334b, side: THREE.DoubleSide });
-      const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
-      nodeMesh.position.copy(mid);
-      nodeMesh.lookAt(this.camera.position);
-      this.orbitsGroup.add(nodeMesh);
+    // 4. Render Candidate Post-Maneuver Orbit Trajectory
+    if (scenario.candidateManeuver && scenario.postManeuverProjection) {
+      this.buildCandidateManeuverPath(scenario);
     }
   }
 
-  renderCandidatePostManeuverOrbit(scenario) {
+  buildSatelliteMarker(sat) {
     const THREE = this.three;
-    const sentinel = scenario.trackableObjects.find(o => o.id === 'SAT-LEO-02');
-    if (!sentinel || !sentinel.orbit) return;
+    const group = new THREE.Group();
+    group.userData = { id: sat.id, name: sat.name, type: sat.objectType };
 
-    // Post-burn orbit has slightly higher semi-major axis (+1.2 km altitude boost)
-    const postOrbit = {
-      ...sentinel.orbit,
-      semiMajorAxisKm: sentinel.orbit.semiMajorAxisKm + 1.25,
-      altitudeKm: sentinel.orbit.altitudeKm + 1.25
-    };
+    const isProtected = sat.id === 'SAT-LEO-02';
+    const isDebris = sat.objectType === 'DEBRIS';
 
-    const points = sampleOrbitPath(postOrbit, 128);
-    const threePoints = points.map(p => new THREE.Vector3(p.x, p.y, p.z));
+    let color = 0x00e5ff; // Cyan
+    if (isDebris) color = 0xff334b; // Red
+    else if (!isProtected) color = 0x94a3b8; // Slate
 
-    const geo = new THREE.BufferGeometry().setFromPoints(threePoints);
-    const mat = new THREE.LineDashedMaterial({
-      color: 0x00e676, // Bright green for cleared post-burn orbit
-      dashSize: 0.25,
-      gapSize: 0.15,
-      transparent: true,
-      opacity: 0.9
+    // Marker diamond/cube shape
+    const geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+    const mat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.3,
+      metalness: 0.8,
+      emissive: color,
+      emissiveIntensity: 0.35
     });
-    const postLine = new THREE.Line(geo, mat);
-    postLine.computeLineDistances();
-    postLine.name = 'postManeuverOrbitLine';
-    postLine.visible = this.showManeuverPreview;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = Math.PI / 4;
+    mesh.rotation.z = Math.PI / 4;
+    group.add(mesh);
 
-    this.maneuverGroup.add(postLine);
+    // Outer beacon pulse ring
+    const ringGeo = new THREE.RingGeometry(0.5, 0.58, 24);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: color,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.6
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    group.add(ring);
+
+    return group;
   }
 
-  toggleManeuverPreview(show) {
-    this.showManeuverPreview = typeof show === 'boolean' ? show : !this.showManeuverPreview;
-    const line = this.maneuverGroup.getObjectByName('postManeuverOrbitLine');
-    if (line) {
-      line.visible = this.showManeuverPreview;
-    }
-    return this.showManeuverPreview;
-  }
-
-  addSelectionRing(mesh) {
+  addSelectionRing(satNode) {
     const THREE = this.three;
-    const ringGeo = new THREE.RingGeometry(0.48, 0.58, 24);
+    const ringGeo = new THREE.RingGeometry(0.85, 0.95, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.85
     });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.name = 'selectionRing';
-    ringMesh.lookAt(this.camera.position);
-    mesh.add(ringMesh);
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.name = 'selectionRing';
+    satNode.add(ring);
+  }
+
+  buildConjunctionMarker(conjunction) {
+    const THREE = this.three;
+    // Mark encounter TCA point along Sentinel-X orbit
+    const sat1 = this.satelliteMeshes.get(conjunction.primarySatelliteId);
+    if (!sat1) return;
+
+    const markerGeo = new THREE.OctahedronGeometry(0.55, 0);
+    const markerMat = new THREE.MeshBasicMaterial({
+      color: 0xff334b,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.9
+    });
+    const marker = new THREE.Mesh(markerGeo, markerMat);
+    marker.position.copy(sat1.position);
+    this.satellitesGroup.add(marker);
+  }
+
+  buildCandidateManeuverPath(scenario) {
+    const THREE = this.three;
+    const primary = scenario.trackableObjects.find(o => o.id === 'SAT-LEO-02');
+    if (!primary || !primary.orbit) return;
+
+    // Projected post-burn orbit: apogee raised by along-track +V burn
+    const postBurnOrbit = {
+      ...primary.orbit,
+      semiMajorAxisKm: primary.orbit.semiMajorAxisKm + 2.45,
+      altitudeKm: primary.orbit.altitudeKm + 2.45
+    };
+
+    const points = sampleOrbitPath(postBurnOrbit, 128);
+    const threePoints = points.map(p => new THREE.Vector3(p.x, p.y, p.z));
+
+    const geo = new THREE.BufferGeometry().setFromPoints(threePoints);
+    const mat = new THREE.LineDashedMaterial({
+      color: 0x00e676, // Nominal green for cleared path
+      dashSize: 0.4,
+      gapSize: 0.2,
+      transparent: true,
+      opacity: 0.85
+    });
+    const postLine = new THREE.Line(geo, mat);
+    postLine.computeLineDistances();
+    this.maneuverGroup.add(postLine);
+    this.maneuverGroup.visible = this.showManeuverPreview;
+  }
+
+  toggleManeuverPreview() {
+    this.showManeuverPreview = !this.showManeuverPreview;
+    if (this.maneuverGroup) {
+      this.maneuverGroup.visible = this.showManeuverPreview;
+    }
+    return this.showManeuverPreview;
   }
 
   setupControls() {
-    const dom = this.renderer.domElement;
+    const dom = this.container;
 
     dom.addEventListener('mousedown', (e) => {
       this.isDragging = true;
@@ -408,7 +550,7 @@ export class OrbitalSceneVisualizer {
 
     dom.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.cameraDistance = Math.max(9.0, Math.min(80.0, this.cameraDistance + e.deltaY * 0.02));
+      this.cameraDistance = Math.max(9.0, Math.min(48.0, this.cameraDistance + e.deltaY * 0.02));
       this.updateCameraPosition();
     }, { passive: false });
   }
@@ -418,29 +560,36 @@ export class OrbitalSceneVisualizer {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
 
-    this.renderer.domElement.addEventListener('click', (e) => {
-      const rect = this.renderer.domElement.getBoundingClientRect();
+    this.container.addEventListener('click', (e) => {
+      const rect = this.container.getBoundingClientRect();
       this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       this.raycaster.setFromCamera(this.mouse, this.camera);
-      const intersects = this.raycaster.intersectObjects(this.satellitesGroup.children);
+      const interactiveMeshes = [];
+      this.satelliteMeshes.forEach(group => {
+        interactiveMeshes.push(...group.children);
+      });
 
+      const intersects = this.raycaster.intersectObjects(interactiveMeshes);
       if (intersects.length > 0) {
-        const satId = intersects[0].object.userData?.id;
-        if (satId) {
-          store.setSelectedSatellite(satId);
+        const parentGroup = intersects[0].object.parent;
+        if (parentGroup && parentGroup.userData?.id) {
+          store.selectSatellite(parentGroup.userData.id);
         }
       }
     });
   }
 
   updateCameraPosition() {
-    const x = this.cameraDistance * Math.cos(this.currentRotation.x) * Math.sin(this.currentRotation.y);
-    const y = this.cameraDistance * Math.sin(this.currentRotation.x);
-    const z = this.cameraDistance * Math.cos(this.currentRotation.x) * Math.cos(this.currentRotation.y);
+    if (!this.camera) return;
+    const r = this.cameraDistance;
+    const phi = this.currentRotation.x;
+    const theta = this.currentRotation.y;
 
-    this.camera.position.set(x, y, z);
+    this.camera.position.x = r * Math.cos(phi) * Math.sin(theta);
+    this.camera.position.y = r * Math.sin(phi);
+    this.camera.position.z = r * Math.cos(phi) * Math.cos(theta);
     this.camera.lookAt(0, 0, 0);
   }
 
@@ -482,9 +631,14 @@ export class OrbitalSceneVisualizer {
       this.currentRotation.y += (this.targetRotation.y - this.currentRotation.y) * 0.08;
       this.updateCameraPosition();
 
-      // Slow realistic axial rotation of the Earth graticule
+      // Slow realistic axial rotation of the Earth and graticule
       if (this.earthGroup) {
-        this.earthGroup.rotation.y += 0.0004;
+        this.earthGroup.rotation.y += 0.00035;
+      }
+
+      // Dynamic differential atmospheric cloud drift
+      if (this.cloudMesh) {
+        this.cloudMesh.rotation.y += 0.0005;
       }
 
       // Rotate selection rings to face camera
@@ -528,6 +682,17 @@ export class OrbitalSceneVisualizer {
     }
     if (this.unsubscribe) {
       this.unsubscribe();
+    }
+    // Dispose loaded textures
+    if (this.loadedTextures) {
+      this.loadedTextures.forEach(t => {
+        try { t.dispose(); } catch {}
+      });
+      this.loadedTextures = [];
+    }
+    // Dispose materials and geometry
+    if (this.earthMat) {
+      try { this.earthMat.dispose(); } catch {}
     }
     if (this.renderer && this.renderer.domElement && this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);

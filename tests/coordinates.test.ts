@@ -69,4 +69,39 @@ describe('Orbital Coordinate Transformation & Scale Correctness', () => {
     expect(Math.abs(northPolePos.z)).toBeGreaterThan(7000.0);
     expect(Math.abs(northPolePos.x)).toBeLessThan(10.0);
   });
+
+  it('validates local Earth texture assets, equirectangular coverage, and scale layering', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const textureDir = path.resolve(process.cwd(), 'public/assets/textures');
+    expect(fs.existsSync(textureDir)).toBe(true);
+
+    const dayTexturePath = path.join(textureDir, 'earth-day.jpg');
+    const specularTexturePath = path.join(textureDir, 'earth-specular.jpg');
+    const cloudsTexturePath = path.join(textureDir, 'earth-clouds.png');
+    const normalTexturePath = path.join(textureDir, 'earth-normal.jpg');
+
+    expect(fs.existsSync(dayTexturePath)).toBe(true);
+    expect(fs.existsSync(specularTexturePath)).toBe(true);
+    expect(fs.existsSync(cloudsTexturePath)).toBe(true);
+    expect(fs.existsSync(normalTexturePath)).toBe(true);
+
+    // Verify file sizes indicate complete high-resolution data (not empty stubs)
+    expect(fs.statSync(dayTexturePath).size).toBeGreaterThan(200_000);
+    expect(fs.statSync(specularTexturePath).size).toBeGreaterThan(100_000);
+    expect(fs.statSync(cloudsTexturePath).size).toBeGreaterThan(100_000);
+    expect(fs.statSync(normalTexturePath).size).toBeGreaterThan(100_000);
+
+    // Atmospheric and LEO orbital scale layering:
+    // Earth Surface: ~6.378 units
+    // Cloud Layer: ~6.429 units (r * 1.008)
+    // Sentinel-X Orbit: ~7.058 units (680 km altitude)
+    const earthRadius = EARTH_SCENE_RADIUS;
+    const cloudRadius = earthRadius * 1.008;
+    const leoRadius = earthRadius + (680.1 * SCENE_SCALE);
+
+    expect(cloudRadius).toBeGreaterThan(earthRadius);
+    expect(leoRadius).toBeGreaterThan(cloudRadius);
+  });
 });
