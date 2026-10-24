@@ -80,6 +80,18 @@ export class ApiClient {
     return this.get(`/conjunctions/${encodeURIComponent(id)}`);
   }
 
+  static async getFeaturedScenario() {
+    return this.get('/scenarios/featured');
+  }
+
+  static async getCandidateManeuver(conjunctionId) {
+    return this.get(`/maneuvers/candidate/${encodeURIComponent(conjunctionId)}`);
+  }
+
+  static async getFlightDirectorAssessment(conjunctionId) {
+    return this.get(`/flight-director/assessment/${encodeURIComponent(conjunctionId)}`);
+  }
+
   static async getEvents(filters = {}) {
     return this.get('/events', filters);
   }

@@ -55,13 +55,32 @@ class ManeuverPlannerController {
   async loadContext() {
     try {
       const state = store.getState();
-      const [satRes, conjRes] = await Promise.all([
+      const conjId = state.selectedConjunctionId || 'CONJ-2026-084';
+      const [satRes, conjRes, manRes] = await Promise.all([
         ApiClient.getSatelliteById(state.selectedSatelliteId || 'SAT-LEO-02').catch(() => null),
-        ApiClient.getConjunctionById(state.selectedConjunctionId || 'CONJ-2026-084').catch(() => null)
+        ApiClient.getConjunctionById(conjId).catch(() => null),
+        ApiClient.getCandidateManeuver(conjId).catch(() => null)
       ]);
 
       this.selectedSatellite = satRes?.data;
       this.selectedConjunction = conjRes?.data;
+
+      // Populate candidate maneuver defaults if available from repository
+      if (manRes?.data?.candidate) {
+        const candidate = manRes.data.candidate;
+        this.deltaVMps = candidate.deltaVMagnitudeMps;
+        this.burnDirection = candidate.burnDirection;
+
+        const slider = document.getElementById('delta-v-slider');
+        const display = document.getElementById('slider-val-display');
+        if (slider) slider.value = this.deltaVMps.toString();
+        if (display) display.textContent = `${this.deltaVMps.toFixed(2)} m/s`;
+
+        // Update direction buttons active state
+        document.querySelectorAll('.burn-dir-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.dir === this.burnDirection);
+        });
+      }
 
       const planConjCode = document.getElementById('plan-conj-code');
       const planSatName = document.getElementById('plan-sat-name');

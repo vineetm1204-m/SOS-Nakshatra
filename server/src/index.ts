@@ -2,25 +2,14 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { 
-  SEED_SATELLITES, 
-  SEED_CONJUNCTIONS, 
-  SEED_EVENTS, 
-  DEFAULT_SETTINGS 
-} from './data/seedData.js';
+import { scenarioRepository } from './services/ScenarioRepository.js';
+import { DEFAULT_SETTINGS } from './data/seedData.js';
 import { FleetSummary, SystemSettings } from './types.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// In-memory operational state (seeded)
-let satellites = [...SEED_SATELLITES];
-let conjunctions = [...SEED_CONJUNCTIONS];
-let events = [...SEED_EVENTS];
+// In-memory operational settings
 let settings: SystemSettings = { ...DEFAULT_SETTINGS };
 
 // Security and middleware
@@ -52,22 +41,35 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 const publicDir = path.resolve(process.cwd(), 'public');
 app.use(express.static(publicDir));
 
-// --- API ROUTES ---
+// --- API ROUTES (Consumed via ScenarioRepository) ---
 
-// 1. Health check
+// 1. Health check & Scenario Integrity
 app.get('/api/v1/health', (_req: Request, res: Response) => {
+  const integrity = scenarioRepository.validateIntegrity();
   res.json({
-    status: 'OK',
+    status: integrity.isValid ? 'OK' : 'DEGRADED',
     system: 'Safe Orbit for Satellites (SOS) Backend',
     version: '1.0.0',
     mode: settings.dataMode,
+    integrityValidation: integrity,
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime())
   });
 });
 
-// 2. Fleet Summary
-app.get('/api/v1/fleet/summary', (_req: Request, res: Response) => {
+// 2. Complete Deterministic Scenario
+app.get('/api/v1/scenarios/featured', async (_req: Request, res: Response) => {
+  const scenario = await scenarioRepository.getDeterministicScenario();
+  res.json({ data: scenario });
+});
+
+// 3. Fleet Summary
+app.get('/api/v1/fleet/summary', async (_req: Request, res: Response) => {
+  const [satellites, conjunctions] = await Promise.all([
+    scenarioRepository.getSatellites(),
+    scenarioRepository.getConjunctions()
+  ]);
+
   const summary: FleetSummary = {
     totalSatellites: satellites.length,
     operationalCount: satellites.filter(s => s.operationalStatus === 'OPERATIONAL').length,
@@ -82,9 +84,9 @@ app.get('/api/v1/fleet/summary', (_req: Request, res: Response) => {
   res.json({ data: summary });
 });
 
-// 3. Satellites
-app.get('/api/v1/satellites', (req: Request, res: Response) => {
-  let result = [...satellites];
+// 4. Satellites
+app.get('/api/v1/satellites', async (req: Request, res: Response) => {
+  let result = await scenarioRepository.getSatellites();
   const { status, orbitClass } = req.query;
 
   if (typeof status === 'string') {
@@ -97,8 +99,8 @@ app.get('/api/v1/satellites', (req: Request, res: Response) => {
   res.json({ data: result, total: result.length });
 });
 
-app.get('/api/v1/satellites/:id', (req: Request, res: Response) => {
-  const sat = satellites.find(s => s.id === req.params.id || s.callsign === req.params.id);
+app.get('/api/v1/satellites/:id', async (req: Request, res: Response) => {
+  const sat = await scenarioRepository.getSatelliteById(req.params.id);
   if (!sat) {
     res.status(404).json({ error: `Satellite '${req.params.id}' not found in fleet registry.` });
     return;
@@ -106,9 +108,9 @@ app.get('/api/v1/satellites/:id', (req: Request, res: Response) => {
   res.json({ data: sat });
 });
 
-// 4. Conjunctions
-app.get('/api/v1/conjunctions', (req: Request, res: Response) => {
-  let result = [...conjunctions];
+// 5. Conjunctions
+app.get('/api/v1/conjunctions', async (req: Request, res: Response) => {
+  let result = await scenarioRepository.getConjunctions();
   const { riskLevel, status } = req.query;
 
   if (typeof riskLevel === 'string') {
@@ -121,13 +123,13 @@ app.get('/api/v1/conjunctions', (req: Request, res: Response) => {
   res.json({ data: result, total: result.length });
 });
 
-app.get('/api/v1/conjunctions/featured', (_req: Request, res: Response) => {
-  const featured = conjunctions.find(c => c.isFeaturedScenario) || conjunctions[0];
+app.get('/api/v1/conjunctions/featured', async (_req: Request, res: Response) => {
+  const featured = await scenarioRepository.getFeaturedConjunction();
   res.json({ data: featured });
 });
 
-app.get('/api/v1/conjunctions/:id', (req: Request, res: Response) => {
-  const conj = conjunctions.find(c => c.id === req.params.id);
+app.get('/api/v1/conjunctions/:id', async (req: Request, res: Response) => {
+  const conj = await scenarioRepository.getConjunctionById(req.params.id);
   if (!conj) {
     res.status(404).json({ error: `Conjunction '${req.params.id}' not found.` });
     return;
@@ -135,28 +137,40 @@ app.get('/api/v1/conjunctions/:id', (req: Request, res: Response) => {
   res.json({ data: conj });
 });
 
-// 5. Operational Events
-app.get('/api/v1/events', (req: Request, res: Response) => {
-  let result = [...events];
-  const { category, severity, limit } = req.query;
-
-  if (typeof category === 'string') {
-    result = result.filter(e => e.category.toLowerCase() === category.toLowerCase());
+// 6. Candidate Maneuver & Post-Maneuver Projection
+app.get('/api/v1/maneuvers/candidate/:conjunctionId', async (req: Request, res: Response) => {
+  const maneuver = await scenarioRepository.getCandidateManeuver(req.params.conjunctionId);
+  const projection = await scenarioRepository.getPostManeuverProjection(req.params.conjunctionId);
+  if (!maneuver) {
+    res.status(404).json({ error: `Candidate maneuver for conjunction '${req.params.conjunctionId}' not found.` });
+    return;
   }
-  if (typeof severity === 'string') {
-    result = result.filter(e => e.severity.toLowerCase() === severity.toLowerCase());
-  }
-  if (typeof limit === 'string') {
-    const lim = parseInt(limit, 10);
-    if (!isNaN(lim)) {
-      result = result.slice(0, lim);
-    }
-  }
-
-  res.json({ data: result, total: result.length });
+  res.json({ data: { candidate: maneuver, projection } });
 });
 
-// 6. Settings
+// 7. Flight Director Assessment
+app.get('/api/v1/flight-director/assessment/:conjunctionId', async (req: Request, res: Response) => {
+  const assessment = await scenarioRepository.getFlightDirectorAssessment(req.params.conjunctionId);
+  if (!assessment) {
+    res.status(404).json({ error: `Flight director assessment for conjunction '${req.params.conjunctionId}' not found.` });
+    return;
+  }
+  res.json({ data: assessment });
+});
+
+// 8. Operational Events
+app.get('/api/v1/events', async (req: Request, res: Response) => {
+  const { category, severity, limit } = req.query;
+  const events = await scenarioRepository.getEvents({
+    category: typeof category === 'string' ? category : undefined,
+    severity: typeof severity === 'string' ? severity : undefined,
+    limit: typeof limit === 'string' ? parseInt(limit, 10) : undefined
+  });
+
+  res.json({ data: events, total: events.length });
+});
+
+// 9. Settings
 app.get('/api/v1/settings', (_req: Request, res: Response) => {
   res.json({ data: settings });
 });
@@ -164,24 +178,6 @@ app.get('/api/v1/settings', (_req: Request, res: Response) => {
 app.post('/api/v1/settings', (req: Request, res: Response) => {
   const updates = req.body;
   settings = { ...settings, ...updates };
-  
-  // Log setting change in event stream
-  events.unshift({
-    id: `EVT-${Date.now()}`,
-    timestamp: new Date().toISOString(),
-    category: 'SYSTEM',
-    severity: 'INFO',
-    title: 'System Settings Updated',
-    description: `Operator updated settings: dataMode=${settings.dataMode}, criticalPc=${settings.criticalCollisionProbabilityThreshold}`,
-    provenance: {
-      source: settings.dataMode === 'DEMO' ? 'SYNTHETIC_DEMO' : 'LIVE_TELEMETRY',
-      provider: 'SOS Local Operator Console',
-      timestamp: new Date().toISOString(),
-      isDeterministicDemo: settings.dataMode === 'DEMO',
-      confidenceScore: 1.0
-    }
-  });
-
   res.json({ data: settings, message: 'Settings successfully updated.' });
 });
 

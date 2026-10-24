@@ -2,15 +2,35 @@
  * SOS Flight Director Controller (autopilot.js)
  * Manages the 6-stage operational execution workflow and operator approval gate.
  */
+import { ApiClient } from '../api.js';
 import { store } from '../state.js';
 
 class FlightDirectorController {
   constructor() {
     this.stage = 'BURN'; // 'BURN' | 'CLEAR'
+    this.assessment = null;
   }
 
-  init() {
+  async init() {
     this.initEventListeners();
+    await this.loadAssessment();
+  }
+
+  async loadAssessment() {
+    try {
+      const state = store.getState();
+      const conjId = state.selectedConjunctionId || 'CONJ-2026-084';
+      const res = await ApiClient.getFlightDirectorAssessment(conjId);
+      if (res?.data) {
+        this.assessment = res.data;
+        const textEl = document.getElementById('fd-assessment-text');
+        if (textEl) {
+          textEl.textContent = this.assessment.summary;
+        }
+      }
+    } catch (err) {
+      console.warn('[Flight Director] Using default assessment:', err.message);
+    }
   }
 
   initEventListeners() {
