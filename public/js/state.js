@@ -23,7 +23,7 @@ class StateStore {
       selectedSatelliteId: localStorage.getItem(STORAGE_KEYS.SATELLITE_ID) || 'SAT-LEO-02',
       selectedConjunctionId: localStorage.getItem(STORAGE_KEYS.CONJUNCTION_ID) || 'CONJ-2026-084',
       dataMode: localStorage.getItem(STORAGE_KEYS.DATA_MODE) || 'DEMO',
-      workflowState: localStorage.getItem(STORAGE_KEYS.WORKFLOW_STATE) || 'CONJUNCTION_DETECTED',
+      workflowState: localStorage.getItem(STORAGE_KEYS.WORKFLOW_STATE) || 'MONITORING',
       candidateManeuver: candidate
     };
     this.listeners = new Set();
