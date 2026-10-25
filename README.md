@@ -535,6 +535,6 @@ Open `http://localhost:3000`, then click **Launch Console** or run the demo. The
 
 <div align="center">
 
-Built by **Team SOS**
+Built SOS by **Team SOS**
 
 </div>
